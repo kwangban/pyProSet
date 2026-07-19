@@ -54,7 +54,7 @@ class StubSharedParamFile(object):
                 elif line.startswith('PARAM\t'):
                     parts = line.split('\t')
                     param_name = parts[2]
-                    group_id = parts[4]
+                    group_id = parts[5]
                     group_name = group_map.get(group_id)
                     if group_name:
                         param_groups[group_name].append(
