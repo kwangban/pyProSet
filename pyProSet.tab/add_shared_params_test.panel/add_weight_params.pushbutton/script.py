@@ -3,19 +3,20 @@
 
 Workflow
 --------
-1. Detect the existing weight parameter in the family by unit type
-   (Force = lbf, or Mass = lbm).
-2. Add CP_ERP_Weight from the ERP shared parameter file.
-3. Add CP_BOM_Weight from the BOM shared parameter file.
-4. Set formulas:
+1. Find parameters whose name contains "Weight" (case-insensitive).
+2. If the parameter reports in lbf (Force unit type), convert to lbm by dividing
+   by 32.174 in the CP_ERP_Weight formula. Otherwise no conversion is needed.
+3. Add CP_ERP_Weight from the ERP shared parameter file.
+4. Add CP_BOM_Weight from the BOM shared parameter file.
+5. Set formulas:
    - Force source : CP_ERP_Weight = <existing> / 32.174
-   - Mass source  : CP_ERP_Weight = <existing>  (no conversion needed)
+   - Other source : CP_ERP_Weight = <existing>  (no conversion)
    - CP_BOM_Weight = CP_ERP_Weight  (chained; one conversion to maintain)
 
 Version compatibility
 ---------------------
-- Revit 2022+  : SpecTypeId.Force / SpecTypeId.Mass  (ForgeTypeId API)
-- Revit 2021-  : ParameterType.Force / ParameterType.Mass
+- Revit 2022+  : SpecTypeId.Force  (ForgeTypeId API)
+- Revit 2021-  : ParameterType.Force
 """
 
 from pyrevit import DB, forms, script
@@ -69,72 +70,69 @@ if not bom_file_path:
     script.exit()
 
 # ---------------------------------------------------------------------------
-# Step 1 -- Find the existing weight parameter by unit type.
+# Step 1 -- Find the total-weight parameter.
+#
+# Strategy (in priority order):
+#   1. Parameters typed as Force or Mass — unambiguous unit-aware detection.
+#   2. Parameters whose name contains "weight" but NOT a per-unit suffix
+#      (e.g. _per_foot, _per_ft, /ft, _linear) — catches Number-typed params.
+#
+# "Weight_per_foot" and similar are excluded here; they will be handled
+# by a separate button in a later phase.
 # ---------------------------------------------------------------------------
-def _unit_kind(fp):
-    """Return 'force', 'mass', or None for a FamilyParameter."""
-    if REVIT_VERSION >= 2022:
-        spec = fp.Definition.GetSpecTypeId()
-        if spec == DB.SpecTypeId.Force:
-            return 'force'
-        if spec == DB.SpecTypeId.Mass:
-            return 'mass'
-    else:
-        pt = fp.Definition.ParameterType
-        if pt == DB.ParameterType.Force:
-            return 'force'
-        if pt == DB.ParameterType.Mass:
-            return 'mass'
-    return None
+_PER_UNIT_PATTERNS = ('per_foot', 'per_ft', 'per_meter', 'per_m', '/ft', '/m', '_linear')
 
-weight_candidates = [
-    (fp, _unit_kind(fp))
-    for fp in doc.FamilyManager.GetParameters()
-    if _unit_kind(fp) is not None
-]
+def _is_force(fp):
+    """Return True if fp reports in lbf (Force unit type)."""
+    if REVIT_VERSION >= 2022:
+        return fp.Definition.GetSpecTypeId() == DB.SpecTypeId.Force
+    return fp.Definition.ParameterType == DB.ParameterType.Force
+
+def _is_mass(fp):
+    if REVIT_VERSION >= 2022:
+        return fp.Definition.GetSpecTypeId() == DB.SpecTypeId.Mass
+    return fp.Definition.ParameterType == DB.ParameterType.Mass
+
+def _is_per_unit(name):
+    lower = name.lower()
+    return any(pat in lower for pat in _PER_UNIT_PATTERNS)
 
 all_params = list(doc.FamilyManager.GetParameters())
 
-if not weight_candidates:
-    # Auto-detection found no Force/Mass parameters — let the user pick manually.
-    all_names = [fp.Definition.Name for fp in all_params]
-    chosen_name = forms.ask_for_one_item(
-        all_names,
-        prompt=(
-            "No Force or Mass parameter was auto-detected.\n"
-            "Select the parameter that holds the weight value:"
-        ),
-        title="Select Weight Parameter",
-    )
-    if not chosen_name:
-        script.exit()
-    source_fp = next(fp for fp in all_params if fp.Definition.Name == chosen_name)
-    unit_choice = forms.ask_for_one_item(
-        ["lbf (Force — divide by 32.174 to get lbm)", "lbm (Mass — no conversion needed)"],
-        prompt="What unit does '{}' report in?".format(chosen_name),
-        title="Select Unit Type",
-    )
-    if not unit_choice:
-        script.exit()
-    source_kind = 'force' if unit_choice.startswith('lbf') else 'mass'
+typed_weight = [fp for fp in all_params if _is_force(fp) or _is_mass(fp)]
+name_weight  = [
+    fp for fp in all_params
+    if 'weight' in fp.Definition.Name.lower()
+    and not _is_per_unit(fp.Definition.Name)
+    and fp not in typed_weight
+]
 
-elif len(weight_candidates) == 1:
-    source_fp, source_kind = weight_candidates[0]
+weight_candidates = typed_weight + name_weight
+
+if not weight_candidates:
+    forms.alert(
+        "No total-weight parameter found.\n\n"
+        "Expected a parameter typed as Force or Mass, or a parameter whose\n"
+        "name contains 'Weight' (excluding per-unit variants like Weight_per_foot).\n\n"
+        "Add a weight parameter first, then run this button.",
+        exitscript=True,
+    )
+
+if len(weight_candidates) == 1:
+    source_fp = weight_candidates[0]
 else:
-    names = [fp.Definition.Name for fp, _ in weight_candidates]
+    names = [fp.Definition.Name for fp in weight_candidates]
     chosen = forms.ask_for_one_item(
         names,
-        prompt="Multiple weight parameters found. Select the source:",
+        prompt="Select the parameter that holds the total weight of this family:",
         title="Select Weight Parameter",
     )
     if not chosen:
         script.exit()
-    source_fp, source_kind = next(
-        (fp, k) for fp, k in weight_candidates if fp.Definition.Name == chosen
-    )
+    source_fp = next(fp for fp in weight_candidates if fp.Definition.Name == chosen)
 
 existing_name = source_fp.Definition.Name
-is_force = (source_kind == 'force')
+is_force = _is_force(source_fp)
 
 # ---------------------------------------------------------------------------
 # Step 2 -- Add CP_ERP_Weight and CP_BOM_Weight, then set formulas.
