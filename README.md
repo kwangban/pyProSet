@@ -39,12 +39,12 @@ CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
   - Any other unit (lbm, Number, etc.) → `CP_ERP_Weight = <param>` (no conversion)
   - `CP_BOM_Weight = CP_ERP_Weight` (chained)
 
-  Parameters are added and formulas are set in **two separate transactions**.
-  The new parameters mirror the source parameter's instance/type setting so
-  that formula references remain at the same level (type→type or instance→instance).
-  If formula setting still fails (e.g. unit-type mismatch between the source
-  and the shared parameter definition), the parameters are still saved and the
-  button shows the exact formulas to enter manually in Family Types.
+  Both parameters are added as **instance parameters**. Parameters and formulas
+  are set in **two separate transactions** (Revit requires a commit before new
+  parameters can be referenced in formulas). If formula setting fails (e.g.
+  unit-type mismatch between the source and the shared parameter definition),
+  the parameters are still saved and the button shows the exact formulas to
+  enter manually in Family Types.
 
   Per-unit parameters such as `Weight_per_foot` are intentionally excluded and will
   be handled by a separate button in a later phase.

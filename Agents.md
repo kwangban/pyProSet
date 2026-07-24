@@ -43,6 +43,9 @@ There are two distinct "group" concepts in this codebase — do not conflate the
   the family properties panel (e.g. `PROP_PANEL_GROUP = GroupTypeId.Construction`).
   Passed to `FamilyManager.AddParameter()`.
 
+`IS_INSTANCE = True` — `CP_ERP_Weight` and `CP_BOM_Weight` are always added as
+instance parameters. Do not change this to mirror the source parameter.
+
 ## Git Deployment Loop
 1. Edit scripts in `pyProSet.tab/` or `lib/`
 2. Run `pytest tests/ -v` — confirm all tests pass
@@ -78,22 +81,6 @@ lbf → lbm. Any other unit type → formula is a direct reference (no conversio
 
 `Weight_per_foot` and similar are intentionally excluded; they will be handled
 by a future button.
-
-## Instance/Type Matching for Formula Compatibility
-When adding a parameter whose formula will reference an existing family parameter,
-mirror the source parameter's instance/type level:
-
-```python
-is_instance = source_fp.IsInstance
-doc.FamilyManager.AddParameter(defn, group, is_instance)
-```
-
-Revit's formula engine enforces level consistency: a type-level formula cannot
-reference an instance parameter, and creating the target at the wrong level
-produces the misleading "invalid formula string" error from `SetFormula`.
-
-`IS_INSTANCE = True` in the CONFIGURE block is a documented default only;
-the runtime value is always derived from `source_fp.IsInstance`.
 
 ## Two-Transaction Pattern for AddParameter + SetFormula
 Revit requires a transaction commit before newly-added parameters can be
