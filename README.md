@@ -15,20 +15,25 @@ backed by a testable, CI-friendly Python library that runs outside Revit.
 
 ## Roadmap
 
-### Phase 1 — Shared Parameter Tools *(in progress)*
+### Phase 1 — Weight Parameter Linking *(in progress)*
 
-Interactive tools for adding shared parameters to Revit family files.
+Automate linking a family's existing weight parameter to the CP_ERP_Weight and
+CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
 
 **Goals:**
-- `add_shared_params` button: lets the user pick a shared parameter file, group,
-  parameter, and binding type via dialogs, then adds it to the active family
-- `lib/shared_param_utils.py`: pure Python parser for the Revit shared parameter
-  `.txt` format, usable in tests without a Revit installation
-- `tests/`: pytest suite covering the parser (stub mode, no Revit required)
+- `add_weight_params` button: detects the family's existing weight parameter by unit
+  type (Force lbf or Mass lbm), adds `CP_ERP_Weight` and `CP_BOM_Weight` as shared
+  parameters, and sets formulas automatically:
+  - Force source → `CP_ERP_Weight = <existing param> / 32.174`
+  - Mass source  → `CP_ERP_Weight = <existing param>` (no conversion)
+  - `CP_BOM_Weight = CP_ERP_Weight` (chained)
+- `lib/shared_param_utils.py`: stub-aware parser for the Revit shared parameter `.txt`
+  format and a pure-Python `make_formula()` helper — both testable without Revit
+- `tests/`: pytest suite covering the parser and formula logic (stub mode, no Revit required)
 
 **Definition of done:** Phase 1 is complete when:
 - All `tests/` pass in a plain Python environment (`pytest tests/ -v`)
-- The `add_shared_params` button successfully adds a shared parameter to an open `.rfa`
+- The `add_weight_params` button correctly adds and links parameters in an open `.rfa`
 - A push to this repo is reflected in Revit after a pyRevit reload (end-to-end Git loop confirmed)
 
 ---
@@ -58,22 +63,39 @@ Bulk operations that set up a full Revit project from a configuration template.
 
 ```
 pyProSet/
-├── pyProSet.tab/               pyRevit extension — tabs at repo root for direct clone
+├── pyProSet.tab/                    pyRevit extension — tabs at repo root for direct clone
 │   ├── add_shared_params_test.panel/
-│   │   └── add_shared_params.pushbutton/
-│   │       ├── script.py       Interactive shared parameter picker
+│   │   └── add_weight_params.pushbutton/
+│   │       ├── script.py            Detects weight param, adds CP_ERP/BOM_Weight, sets formulas
 │   │       └── icon.png
 │   └── key_plan.panel/
 │       └── Types.pushbutton/
 │           ├── script.py
 │           └── icon.png
 ├── lib/
-│   └── shared_param_utils.py   Stub-aware parser — works in and out of Revit
+│   └── shared_param_utils.py        Stub-aware parser + make_formula() — works in and out of Revit
 ├── tests/
 │   └── test_shared_param_utils.py
-├── CLAUDE.md                   Rules for Claude Code agents working in this repo
+├── CLAUDE.md                        Rules for Claude Code agents working in this repo
 └── README.md
 ```
+
+---
+
+## Configuration
+
+Before using the `add_weight_params` button, fill in the `# CONFIGURE` constants
+at the top of [script.py](pyProSet.tab/add_shared_params_test.panel/add_weight_params.pushbutton/script.py):
+
+```python
+ERP_PARAM_FILE = r"\\server\share\CP_ERP_Params.txt"   # path to ERP shared param file
+BOM_PARAM_FILE = r"\\server\share\CP_BOM_Params.txt"   # path to BOM shared param file
+ERP_GROUP_NAME = "CP Parameters"                         # group name inside ERP file
+BOM_GROUP_NAME = "CP Parameters"                         # group name inside BOM file
+```
+
+`ERP_PARAM_NAME`, `BOM_PARAM_NAME`, `GRAVITY_CONV`, and `IS_INSTANCE` can also be
+adjusted here if the parameter names or conversion factor ever change.
 
 ---
 

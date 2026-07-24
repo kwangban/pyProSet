@@ -67,6 +67,18 @@ class StubSharedParamFile(object):
         ]
 
 
+def make_formula(existing_name, is_force, gravity_conv=32.174):
+    """Return the Revit formula string for CP_ERP_Weight.
+
+    existing_name : str  -- display name of the source FamilyParameter
+    is_force      : bool -- True if source is Force (lbf); False if Mass (lbm)
+    gravity_conv  : float -- divisor used when converting lbf to lbm
+    """
+    if is_force:
+        return "{} / {}".format(existing_name, gravity_conv)
+    return existing_name
+
+
 def load_definition(app, sp_file_path, group_name, param_name):
     """Return an ExternalDefinition (or stub) for the named parameter.
 

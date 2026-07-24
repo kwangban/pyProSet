@@ -26,6 +26,14 @@ Each pushbutton `script.py` should:
 2. Then call Revit API via pyRevit (`from pyrevit import DB, forms`)
 3. Nothing else — no business logic directly in `script.py`
 
+## CONFIGURE block convention
+Targeted scripts (those that operate on specific parameters or files rather than
+prompting the user interactively) keep all configurable values in a clearly-labelled
+`# CONFIGURE` block at the top of `script.py`. Network paths, parameter names, and
+conversion constants belong here — never hardcoded inline. When network paths are
+not yet known, leave the placeholder strings and mark them `# CONFIGURE` so they
+are easy to find and update.
+
 ## Unit testing pattern
 `lib/` modules detect the Revit API at import time (`try: from Autodesk.Revit.DB import ...`).
 When the import fails (outside Revit), stubs defined in the same file are used instead.

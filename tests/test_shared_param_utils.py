@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 
-from shared_param_utils import StubSharedParamFile, load_definition
+from shared_param_utils import StubSharedParamFile, load_definition, make_formula
 
 SAMPLE_SP = (
     "*META\tVERSION\tMINVERSION\n"
@@ -26,6 +26,23 @@ MULTI_GROUP_SP = (
     "PARAM\taaaa-0001\tParamA\tTEXT\t\t1\t1\t\t1\n"
     "PARAM\taaaa-0002\tParamB\tTEXT\t\t2\t1\t\t1\n"
 )
+
+
+class TestMakeFormula:
+    def test_force_param_gets_division_formula(self):
+        assert make_formula("Weight", True) == "Weight / 32.174"
+
+    def test_mass_param_gets_direct_reference(self):
+        assert make_formula("Weight", False) == "Weight"
+
+    def test_formula_preserves_exact_param_name(self):
+        assert make_formula("My Weird Name", True) == "My Weird Name / 32.174"
+
+    def test_custom_gravity_constant(self):
+        assert make_formula("W", True, gravity_conv=9.81) == "W / 9.81"
+
+    def test_mass_ignores_gravity_constant(self):
+        assert make_formula("W", False, gravity_conv=9.81) == "W"
 
 
 class TestStubSharedParamFile:
