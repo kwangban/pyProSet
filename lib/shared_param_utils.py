@@ -108,11 +108,27 @@ class StubSharedParamFile(object):
 # on a family that already has these parameters.
 OUTPUT_PARAM_NAMES = ("CP_ERP_Weight", "CP_BOM_Weight")
 
+# DATATYPE values (column 4 of the PARAM line in a shared param .txt file)
+# that indicate lbf units. Revit treats Force and Weight (Structural discipline)
+# as distinct API types (SpecTypeId.Force vs SpecTypeId.Weight) but both report
+# in lbf and both require the / 32.174 conversion to lbm.
+FORCE_LIKE_DATATYPES = frozenset(("FORCE", "WEIGHT"))
+
 # Substrings that identify per-unit weight parameters (e.g. Weight_per_foot).
 # These are excluded from total-weight detection and reserved for a future phase.
 PER_UNIT_PATTERNS = (
     'per_foot', 'per_ft', 'per_meter', 'per_m', '/ft', '/m', '_linear',
 )
+
+
+def is_force_like_datatype(data_type):
+    """Return True if *data_type* (from a shared param .txt file) indicates lbf.
+
+    Both 'FORCE' and 'WEIGHT' (Structural discipline) report in lbf and require
+    the / 32.174 conversion when used as a source for CP_ERP_Weight.
+    Case-insensitive.
+    """
+    return data_type.upper() in FORCE_LIKE_DATATYPES
 
 
 def is_output_param(name):

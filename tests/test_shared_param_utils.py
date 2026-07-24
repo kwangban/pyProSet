@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 
-from shared_param_utils import StubSharedParamFile, StubApp, load_definition, make_formula, is_per_unit, is_output_param
+from shared_param_utils import StubSharedParamFile, StubApp, load_definition, make_formula, is_per_unit, is_output_param, is_force_like_datatype
 
 SAMPLE_SP = (
     "*META\tVERSION\tMINVERSION\n"
@@ -55,6 +55,24 @@ class TestIsPerUnit:
 
     def test_case_insensitive(self):
         assert is_per_unit("WEIGHT_PER_FOOT") is True
+
+
+class TestIsForceLikeDatatype:
+    def test_force_is_force_like(self):
+        assert is_force_like_datatype("FORCE") is True
+
+    def test_weight_is_force_like(self):
+        # Structural Weight type also reports in lbf — needs /32.174 conversion
+        assert is_force_like_datatype("WEIGHT") is True
+
+    def test_mass_is_not_force_like(self):
+        assert is_force_like_datatype("MASS") is False
+
+    def test_number_is_not_force_like(self):
+        assert is_force_like_datatype("NUMBER") is False
+
+    def test_case_insensitive(self):
+        assert is_force_like_datatype("weight") is True
 
 
 class TestIsOutputParam:
