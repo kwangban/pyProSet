@@ -43,6 +43,12 @@ clearly-labelled `# CONFIGURE` block at the top of `script.py`. Never hardcode t
 values inline. File paths that vary per user or environment are prompted at runtime via
 `forms.pick_file()` rather than stored as constants.
 
+Note the distinction between two types of "group name":
+- **Shared param file group** (`ERP_GROUP_NAME`, `BOM_GROUP_NAME`): the group name as
+  it appears inside the `.txt` file (e.g. `"Enterprise Resource Planning"`, `"CP_BOM_Reporting"`)
+- **Family editor group** (`PROP_PANEL_GROUP`): the Revit UI group where the parameter
+  appears in the family properties panel (currently `Construction`)
+
 ## Unit testing pattern
 `lib/` modules detect the Revit API at import time (`try: from Autodesk.Revit.DB import ...`).
 When the import fails (outside Revit), stubs defined in the same file are used instead.

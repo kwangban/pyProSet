@@ -35,6 +35,14 @@ Fixed constants (parameter names, group names, conversion factors) go in a `# CO
 block at the top of `script.py`. File paths that vary by machine or user are prompted
 at runtime via `forms.pick_file()` — not stored as constants.
 
+There are two distinct "group" concepts in this codebase — do not conflate them:
+- **Shared param file group**: the group name inside the `.txt` file that the parameter
+  belongs to (e.g. `ERP_GROUP_NAME = "Enterprise Resource Planning"`,
+  `BOM_GROUP_NAME = "CP_BOM_Reporting"`). Passed to `load_definition()`.
+- **Family editor group**: the Revit UI category under which the parameter appears in
+  the family properties panel (e.g. `PROP_PANEL_GROUP = GroupTypeId.Construction`).
+  Passed to `FamilyManager.AddParameter()`.
+
 ## Git Deployment Loop
 1. Edit scripts in `pyProSet.tab/` or `lib/`
 2. Run `pytest tests/ -v` — confirm all tests pass

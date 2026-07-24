@@ -3,20 +3,22 @@
 
 Workflow
 --------
-1. Find parameters whose name contains "Weight" (case-insensitive).
-2. If the parameter reports in lbf (Force unit type), convert to lbm by dividing
-   by 32.174 in the CP_ERP_Weight formula. Otherwise no conversion is needed.
-3. Add CP_ERP_Weight from the ERP shared parameter file.
-4. Add CP_BOM_Weight from the BOM shared parameter file.
+1. Find the family's total-weight parameter (two-pass detection):
+   a. Parameters typed as Force (lbf) or Mass (lbm) — unambiguous unit check
+   b. Fallback: parameters whose name contains "Weight" (case-insensitive),
+      excluding per-unit names like Weight_per_foot
+2. Add CP_ERP_Weight from group "Enterprise Resource Planning" in the ERP file.
+3. Add CP_BOM_Weight from group "CP_BOM_Reporting" in the BOM file.
+4. Both parameters are placed under the Construction group in the family editor.
 5. Set formulas:
-   - Force source : CP_ERP_Weight = <existing> / 32.174
+   - Force source : CP_ERP_Weight = <existing> / 32.174  (lbf -> lbm)
    - Other source : CP_ERP_Weight = <existing>  (no conversion)
-   - CP_BOM_Weight = CP_ERP_Weight  (chained; one conversion to maintain)
+   - CP_BOM_Weight = CP_ERP_Weight  (chained)
 
 Version compatibility
 ---------------------
-- Revit 2022+  : SpecTypeId.Force  (ForgeTypeId API)
-- Revit 2021-  : ParameterType.Force
+- Revit 2022+  : SpecTypeId.Force / GroupTypeId.Construction  (ForgeTypeId API)
+- Revit 2021-  : ParameterType.Force / BuiltInParameterGroup.PG_CONSTRUCTION
 """
 
 from pyrevit import DB, forms, script
@@ -25,7 +27,8 @@ from shared_param_utils import load_definition, make_formula, is_per_unit  # noq
 # ---------------------------------------------------------------------------
 # CONFIGURE -- fixed business constants (paths are prompted at runtime)
 # ---------------------------------------------------------------------------
-GROUP_NAME     = "Construction"   # group name inside both shared param files
+ERP_GROUP_NAME = "Enterprise Resource Planning"   # group inside ERP shared param file
+BOM_GROUP_NAME = "CP_BOM_Reporting"               # group inside BOM shared param file
 ERP_PARAM_NAME = "CP_ERP_Weight"
 BOM_PARAM_NAME = "CP_BOM_Weight"
 GRAVITY_CONV   = 32.174
@@ -38,9 +41,9 @@ doc = __revit__.ActiveUIDocument.Document  # noqa: F821
 REVIT_VERSION = int(app.VersionNumber)
 
 if REVIT_VERSION >= 2022:
-    PROP_PANEL_GROUP = DB.GroupTypeId.Data
+    PROP_PANEL_GROUP = DB.GroupTypeId.Construction
 else:
-    PROP_PANEL_GROUP = DB.BuiltInParameterGroup.PG_DATA
+    PROP_PANEL_GROUP = DB.BuiltInParameterGroup.PG_CONSTRUCTION
 
 # ---------------------------------------------------------------------------
 # Guard: family documents only.
@@ -149,12 +152,12 @@ try:
 
     erp_fp = _get_family_param(ERP_PARAM_NAME)
     if erp_fp is None:
-        erp_def = load_definition(app, erp_file_path, GROUP_NAME, ERP_PARAM_NAME)
+        erp_def = load_definition(app, erp_file_path, ERP_GROUP_NAME, ERP_PARAM_NAME)
         erp_fp = doc.FamilyManager.AddParameter(erp_def, PROP_PANEL_GROUP, IS_INSTANCE)
 
     bom_fp = _get_family_param(BOM_PARAM_NAME)
     if bom_fp is None:
-        bom_def = load_definition(app, bom_file_path, GROUP_NAME, BOM_PARAM_NAME)
+        bom_def = load_definition(app, bom_file_path, BOM_GROUP_NAME, BOM_PARAM_NAME)
         bom_fp = doc.FamilyManager.AddParameter(bom_def, PROP_PANEL_GROUP, IS_INSTANCE)
 
     doc.FamilyManager.SetFormula(erp_fp, make_formula(existing_name, is_force, GRAVITY_CONV))

@@ -23,8 +23,9 @@ CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
 **Goals:**
 - `add_weight_params` button: prompts the user to select the ERP and BOM shared
   parameter files via file-picker dialogs, finds the family's total-weight parameter,
-  adds `CP_ERP_Weight` and `CP_BOM_Weight` as shared parameters (group: `Construction`),
-  and sets formulas automatically.
+  adds `CP_ERP_Weight` (from group `Enterprise Resource Planning`) and `CP_BOM_Weight`
+  (from group `CP_BOM_Reporting`) as shared parameters, places both under `Construction`
+  in the family editor, and sets formulas automatically.
 
   **Weight parameter detection** (in priority order):
   1. Any parameter typed as **Force** (lbf) or **Mass** (lbm) — unit-aware, unambiguous
