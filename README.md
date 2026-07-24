@@ -1,6 +1,6 @@
 # pyProSet
 
-A pyRevit extension for Southland project setup workflows. Provides a `pyProSet` tab
+A pyRevit extension for project setup workflows. Provides a `pyProSet` tab
 in the Revit ribbon with tools for managing shared parameters and key plan configuration.
 
 ---
