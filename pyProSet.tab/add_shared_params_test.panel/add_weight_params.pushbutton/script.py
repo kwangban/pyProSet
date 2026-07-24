@@ -27,7 +27,7 @@ Version compatibility
 """
 
 from pyrevit import DB, forms, script
-from shared_param_utils import load_definition, make_formula, is_per_unit  # noqa: F401 -- lib/
+from shared_param_utils import load_definition, make_formula, is_per_unit, is_output_param  # noqa: F401 -- lib/
 
 # ---------------------------------------------------------------------------
 # CONFIGURE -- fixed business constants (paths are prompted at runtime)
@@ -102,18 +102,16 @@ def _is_mass(fp):
 
 all_params = list(doc.FamilyManager.GetParameters())
 
-_OUTPUT_PARAMS = (ERP_PARAM_NAME, BOM_PARAM_NAME)
-
 typed_weight = [
     fp for fp in all_params
     if (_is_force(fp) or _is_mass(fp))
-    and fp.Definition.Name not in _OUTPUT_PARAMS
+    and not is_output_param(fp.Definition.Name)
 ]
 name_weight  = [
     fp for fp in all_params
     if 'weight' in fp.Definition.Name.lower()
     and not is_per_unit(fp.Definition.Name)
-    and fp.Definition.Name not in _OUTPUT_PARAMS
+    and not is_output_param(fp.Definition.Name)
     and fp not in typed_weight
 ]
 

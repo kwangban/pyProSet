@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 
-from shared_param_utils import StubSharedParamFile, StubApp, load_definition, make_formula, is_per_unit
+from shared_param_utils import StubSharedParamFile, StubApp, load_definition, make_formula, is_per_unit, is_output_param
 
 SAMPLE_SP = (
     "*META\tVERSION\tMINVERSION\n"
@@ -55,6 +55,20 @@ class TestIsPerUnit:
 
     def test_case_insensitive(self):
         assert is_per_unit("WEIGHT_PER_FOOT") is True
+
+
+class TestIsOutputParam:
+    def test_erp_weight_is_output(self):
+        assert is_output_param("CP_ERP_Weight") is True
+
+    def test_bom_weight_is_output(self):
+        assert is_output_param("CP_BOM_Weight") is True
+
+    def test_plain_weight_is_not_output(self):
+        assert is_output_param("Weight") is False
+
+    def test_check_is_case_sensitive(self):
+        assert is_output_param("cp_erp_weight") is False
 
 
 class TestMakeFormula:

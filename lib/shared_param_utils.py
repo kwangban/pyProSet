@@ -101,11 +101,26 @@ class StubSharedParamFile(object):
         ]
 
 
+# Names of the output parameters that this tool adds. Excluded from weight
+# candidate detection to prevent circular formulas when the button is re-run
+# on a family that already has these parameters.
+OUTPUT_PARAM_NAMES = ("CP_ERP_Weight", "CP_BOM_Weight")
+
 # Substrings that identify per-unit weight parameters (e.g. Weight_per_foot).
 # These are excluded from total-weight detection and reserved for a future phase.
 PER_UNIT_PATTERNS = (
     'per_foot', 'per_ft', 'per_meter', 'per_m', '/ft', '/m', '_linear',
 )
+
+
+def is_output_param(name):
+    """Return True if *name* is one of the output parameters added by this tool.
+
+    CP_ERP_Weight and CP_BOM_Weight are excluded from weight candidate
+    detection to prevent circular formulas when the button is re-run on
+    a family that already has these parameters.
+    """
+    return name in OUTPUT_PARAM_NAMES
 
 
 def is_per_unit(name):
