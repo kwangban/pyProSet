@@ -20,7 +20,7 @@ Version compatibility
 """
 
 from pyrevit import DB, forms, script
-from shared_param_utils import load_definition, make_formula  # noqa: F401 -- lib/
+from shared_param_utils import load_definition, make_formula, is_per_unit  # noqa: F401 -- lib/
 
 # ---------------------------------------------------------------------------
 # CONFIGURE -- fixed business constants (paths are prompted at runtime)
@@ -80,8 +80,6 @@ if not bom_file_path:
 # "Weight_per_foot" and similar are excluded here; they will be handled
 # by a separate button in a later phase.
 # ---------------------------------------------------------------------------
-_PER_UNIT_PATTERNS = ('per_foot', 'per_ft', 'per_meter', 'per_m', '/ft', '/m', '_linear')
-
 def _is_force(fp):
     """Return True if fp reports in lbf (Force unit type)."""
     if REVIT_VERSION >= 2022:
@@ -89,13 +87,10 @@ def _is_force(fp):
     return fp.Definition.ParameterType == DB.ParameterType.Force
 
 def _is_mass(fp):
+    """Return True if fp reports in lbm (Mass unit type)."""
     if REVIT_VERSION >= 2022:
         return fp.Definition.GetSpecTypeId() == DB.SpecTypeId.Mass
     return fp.Definition.ParameterType == DB.ParameterType.Mass
-
-def _is_per_unit(name):
-    lower = name.lower()
-    return any(pat in lower for pat in _PER_UNIT_PATTERNS)
 
 all_params = list(doc.FamilyManager.GetParameters())
 
@@ -103,7 +98,7 @@ typed_weight = [fp for fp in all_params if _is_force(fp) or _is_mass(fp)]
 name_weight  = [
     fp for fp in all_params
     if 'weight' in fp.Definition.Name.lower()
-    and not _is_per_unit(fp.Definition.Name)
+    and not is_per_unit(fp.Definition.Name)
     and fp not in typed_weight
 ]
 

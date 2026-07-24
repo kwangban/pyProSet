@@ -67,6 +67,23 @@ class StubSharedParamFile(object):
         ]
 
 
+# Substrings that identify per-unit weight parameters (e.g. Weight_per_foot).
+# These are excluded from total-weight detection and reserved for a future phase.
+PER_UNIT_PATTERNS = (
+    'per_foot', 'per_ft', 'per_meter', 'per_m', '/ft', '/m', '_linear',
+)
+
+
+def is_per_unit(name):
+    """Return True if *name* looks like a per-unit weight parameter.
+
+    Used to exclude parameters such as ``Weight_per_foot`` from total-weight
+    detection while still allowing a plain ``Weight`` parameter through.
+    """
+    lower = name.lower()
+    return any(pat in lower for pat in PER_UNIT_PATTERNS)
+
+
 def make_formula(existing_name, is_force, gravity_conv=32.174):
     """Return the Revit formula string for CP_ERP_Weight.
 

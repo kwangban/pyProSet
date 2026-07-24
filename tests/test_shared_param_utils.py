@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 
-from shared_param_utils import StubSharedParamFile, load_definition, make_formula
+from shared_param_utils import StubSharedParamFile, load_definition, make_formula, is_per_unit
 
 SAMPLE_SP = (
     "*META\tVERSION\tMINVERSION\n"
@@ -26,6 +26,35 @@ MULTI_GROUP_SP = (
     "PARAM\taaaa-0001\tParamA\tTEXT\t\t1\t1\t\t1\n"
     "PARAM\taaaa-0002\tParamB\tTEXT\t\t2\t1\t\t1\n"
 )
+
+
+class TestIsPerUnit:
+    def test_per_foot_excluded(self):
+        assert is_per_unit("Weight_per_foot") is True
+
+    def test_per_ft_excluded(self):
+        assert is_per_unit("Weight_per_ft") is True
+
+    def test_per_meter_excluded(self):
+        assert is_per_unit("Weight_per_meter") is True
+
+    def test_per_m_excluded(self):
+        assert is_per_unit("Weight_per_m") is True
+
+    def test_slash_ft_excluded(self):
+        assert is_per_unit("Weight/ft") is True
+
+    def test_linear_excluded(self):
+        assert is_per_unit("Weight_linear") is True
+
+    def test_plain_weight_allowed(self):
+        assert is_per_unit("Weight") is False
+
+    def test_total_weight_allowed(self):
+        assert is_per_unit("Total_Weight") is False
+
+    def test_case_insensitive(self):
+        assert is_per_unit("WEIGHT_PER_FOOT") is True
 
 
 class TestMakeFormula:

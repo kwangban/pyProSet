@@ -22,12 +22,24 @@ CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
 
 **Goals:**
 - `add_weight_params` button: prompts the user to select the ERP and BOM shared
-  parameter files via file-picker dialogs, detects the family's existing weight
-  parameter by unit type (Force lbf or Mass lbm), adds `CP_ERP_Weight` and
-  `CP_BOM_Weight` as shared parameters (group: `Construction`), and sets formulas:
-  - Force source → `CP_ERP_Weight = <existing param> / 32.174`
-  - Mass source  → `CP_ERP_Weight = <existing param>` (no conversion)
+  parameter files via file-picker dialogs, finds the family's total-weight parameter,
+  adds `CP_ERP_Weight` and `CP_BOM_Weight` as shared parameters (group: `Construction`),
+  and sets formulas automatically.
+
+  **Weight parameter detection** (in priority order):
+  1. Any parameter typed as **Force** (lbf) or **Mass** (lbm) — unit-aware, unambiguous
+  2. Any parameter whose name contains **"weight"** (case-insensitive), excluding
+     per-unit variants such as `Weight_per_foot` — catches `Number`-typed weight params
+
+  If more than one candidate is found after filtering, the user is prompted to pick.
+
+  **Formula logic:**
+  - Parameter reports in **lbf** (Force type) → `CP_ERP_Weight = <param> / 32.174`
+  - Any other unit (lbm, Number, etc.) → `CP_ERP_Weight = <param>` (no conversion)
   - `CP_BOM_Weight = CP_ERP_Weight` (chained)
+
+  Per-unit parameters such as `Weight_per_foot` are intentionally excluded and will
+  be handled by a separate button in a later phase.
 - `lib/shared_param_utils.py`: stub-aware parser for the Revit shared parameter `.txt`
   format and a pure-Python `make_formula()` helper — both testable without Revit
 - `tests/`: pytest suite covering the parser and formula logic (stub mode, no Revit required)
