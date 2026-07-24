@@ -153,11 +153,15 @@ try:
     erp_fp = _get_family_param(ERP_PARAM_NAME)
     if erp_fp is None:
         erp_def = load_definition(app, erp_file_path, ERP_GROUP_NAME, ERP_PARAM_NAME)
+        # load_definition restores SharedParametersFilename after parsing, but
+        # AddParameter requires the file to still be active — re-set it here.
+        app.SharedParametersFilename = erp_file_path
         erp_fp = doc.FamilyManager.AddParameter(erp_def, PROP_PANEL_GROUP, IS_INSTANCE)
 
     bom_fp = _get_family_param(BOM_PARAM_NAME)
     if bom_fp is None:
         bom_def = load_definition(app, bom_file_path, BOM_GROUP_NAME, BOM_PARAM_NAME)
+        app.SharedParametersFilename = bom_file_path
         bom_fp = doc.FamilyManager.AddParameter(bom_def, PROP_PANEL_GROUP, IS_INSTANCE)
 
     doc.FamilyManager.SetFormula(erp_fp, make_formula(existing_name, is_force, GRAVITY_CONV))
