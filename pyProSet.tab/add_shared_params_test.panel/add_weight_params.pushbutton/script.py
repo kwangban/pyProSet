@@ -3,17 +3,22 @@
 
 Workflow
 --------
-1. Find the family's total-weight parameter (two-pass detection):
+1. Prompt for ERP and BOM shared parameter file paths via file-picker dialogs.
+2. Find the family's total-weight parameter (two-pass detection):
    a. Parameters typed as Force (lbf) or Mass (lbm) — unambiguous unit check
    b. Fallback: parameters whose name contains "Weight" (case-insensitive),
       excluding per-unit names like Weight_per_foot
-2. Add CP_ERP_Weight from group "Enterprise Resource Planning" in the ERP file.
-3. Add CP_BOM_Weight from group "CP_BOM_Reporting" in the BOM file.
-4. Both parameters are placed under the Construction group in the family editor.
-5. Set formulas:
+3. Transaction 1 — Add parameters:
+   - CP_ERP_Weight from group "Enterprise Resource Planning" in the ERP file
+   - CP_BOM_Weight from group "CP_BOM_Reporting" in the BOM file
+   - Both placed under the Construction group in the family editor
+4. Transaction 2 — Set formulas (separate from step 3; Revit requires a commit
+   before new parameters can be referenced in formulas):
    - Force source : CP_ERP_Weight = <existing> / 32.174  (lbf -> lbm)
    - Other source : CP_ERP_Weight = <existing>  (no conversion)
    - CP_BOM_Weight = CP_ERP_Weight  (chained)
+   If formula setting fails (e.g. unit-type mismatch), the parameters are still
+   saved and the user is shown the exact formulas to enter manually.
 
 Version compatibility
 ---------------------
@@ -133,7 +138,10 @@ existing_name = source_fp.Definition.Name
 is_force = _is_force(source_fp)
 
 # ---------------------------------------------------------------------------
-# Step 2 -- Add CP_ERP_Weight and CP_BOM_Weight, then set formulas.
+# Step 2 -- Add CP_ERP_Weight and CP_BOM_Weight (Transaction 1).
+#
+# Parameters must be committed before SetFormula can reference them, so
+# AddParameter and SetFormula are split into two separate transactions.
 # ---------------------------------------------------------------------------
 def _get_family_param(name):
     return next(
@@ -143,12 +151,10 @@ def _get_family_param(name):
     )
 
 original_sp = app.SharedParametersFilename
-success = False
-error_msg = ""
 
-t = DB.Transaction(doc, "Add CP Weight Parameters")
+t1 = DB.Transaction(doc, "Add CP Weight Parameters")
 try:
-    t.Start()
+    t1.Start()
 
     erp_fp = _get_family_param(ERP_PARAM_NAME)
     if erp_fp is None:
@@ -164,38 +170,76 @@ try:
         app.SharedParametersFilename = bom_file_path
         bom_fp = doc.FamilyManager.AddParameter(bom_def, PROP_PANEL_GROUP, IS_INSTANCE)
 
-    doc.FamilyManager.SetFormula(erp_fp, make_formula(existing_name, is_force, GRAVITY_CONV))
-    doc.FamilyManager.SetFormula(bom_fp, ERP_PARAM_NAME)
-
-    t.Commit()
-    success = True
+    t1.Commit()
 
 except Exception as ex:
-    if t.HasStarted() and not t.HasEnded():
-        t.RollBack()
-    error_msg = str(ex)
+    if t1.HasStarted() and not t1.HasEnded():
+        t1.RollBack()
+    app.SharedParametersFilename = original_sp or ""
+    forms.alert("Failed to add parameters:\n{}".format(str(ex)), exitscript=True)
 finally:
     app.SharedParametersFilename = original_sp or ""
 
-if not success:
-    forms.alert("Failed:\n{}".format(error_msg), exitscript=True)
+# Re-fetch handles after T1 commits — stale handles from inside a committed
+# transaction are not safe to use for subsequent API calls.
+erp_fp = _get_family_param(ERP_PARAM_NAME)
+bom_fp = _get_family_param(BOM_PARAM_NAME)
 
 # ---------------------------------------------------------------------------
-# Step 3 -- Save in-place and report.
+# Step 3 -- Set formulas (Transaction 2).
+#
+# If Revit rejects a formula (e.g. unit-type mismatch between the source
+# parameter and CP_ERP_Weight), the parameters remain — only the formula
+# step is rolled back.  The user is shown the exact formulas to enter
+# manually in Family Types.
+# ---------------------------------------------------------------------------
+erp_formula = make_formula(existing_name, is_force, GRAVITY_CONV)
+formula_success = False
+formula_error = ""
+
+t2 = DB.Transaction(doc, "Set CP Weight Formulas")
+try:
+    t2.Start()
+    doc.FamilyManager.SetFormula(erp_fp, erp_formula)
+    doc.FamilyManager.SetFormula(bom_fp, ERP_PARAM_NAME)
+    t2.Commit()
+    formula_success = True
+except Exception as ex:
+    if t2.HasStarted() and not t2.HasEnded():
+        t2.RollBack()
+    formula_error = str(ex)
+
+# ---------------------------------------------------------------------------
+# Step 4 -- Save in-place and report.
 # ---------------------------------------------------------------------------
 doc.Save()
 
-conv_note = " (converted from lbf / {})".format(GRAVITY_CONV) if is_force else ""
-forms.alert(
-    "Done.\n\n"
-    "Source : {name}{conv}\n"
-    "{erp}  = {formula}\n"
-    "{bom}  = {erp}".format(
-        name=existing_name,
-        conv=conv_note,
-        erp=ERP_PARAM_NAME,
-        formula=make_formula(existing_name, is_force, GRAVITY_CONV),
-        bom=BOM_PARAM_NAME,
-    ),
-    title="CP Weight Parameters Linked",
-)
+if formula_success:
+    conv_note = " (converted from lbf / {})".format(GRAVITY_CONV) if is_force else ""
+    forms.alert(
+        "Done.\n\n"
+        "Source : {name}{conv}\n"
+        "{erp}  = {formula}\n"
+        "{bom}  = {erp}".format(
+            name=existing_name,
+            conv=conv_note,
+            erp=ERP_PARAM_NAME,
+            formula=erp_formula,
+            bom=BOM_PARAM_NAME,
+        ),
+        title="CP Weight Parameters Linked",
+    )
+else:
+    forms.alert(
+        "Parameters added to Construction group.\n\n"
+        "Formulas could not be set automatically:\n{}\n\n"
+        "Please enter these formulas manually in Family Types:\n\n"
+        "  {erp} = {formula}\n"
+        "  {bom} = {erp}".format(
+            formula_error,
+            erp=ERP_PARAM_NAME,
+            formula=erp_formula,
+            bom=BOM_PARAM_NAME,
+        ),
+        title="Parameters Added — Enter Formulas Manually",
+    )

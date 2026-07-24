@@ -39,6 +39,11 @@ CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
   - Any other unit (lbm, Number, etc.) → `CP_ERP_Weight = <param>` (no conversion)
   - `CP_BOM_Weight = CP_ERP_Weight` (chained)
 
+  Parameters are added and formulas are set in **two separate transactions**.
+  If formula setting fails (e.g. unit-type mismatch between the source parameter
+  and the shared parameter definition), the parameters are still saved and the
+  button shows the exact formulas to enter manually in Family Types.
+
   Per-unit parameters such as `Weight_per_foot` are intentionally excluded and will
   be handled by a separate button in a later phase.
 - `lib/shared_param_utils.py`: stub-aware parser for the Revit shared parameter `.txt`

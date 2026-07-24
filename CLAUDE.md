@@ -55,6 +55,30 @@ When the import fails (outside Revit), stubs defined in the same file are used i
 Tests call `lib/` functions with `app=None` or `app=StubApp()` to exercise the stub path.
 Do not introduce mocking libraries or additional pip packages.
 
+## Two-transaction pattern for AddParameter + SetFormula
+Revit requires a transaction commit before newly-added parameters can be referenced
+in formulas.  Always use two separate transactions:
+
+```python
+# T1 — add parameters
+t1 = DB.Transaction(doc, "Add Parameters")
+t1.Start()
+fp = doc.FamilyManager.AddParameter(defn, group, is_instance)
+t1.Commit()
+
+# Re-fetch handle — stale handles from inside a committed transaction are unsafe
+fp = next(p for p in doc.FamilyManager.GetParameters() if p.Definition.Name == name)
+
+# T2 — set formulas
+t2 = DB.Transaction(doc, "Set Formulas")
+t2.Start()
+doc.FamilyManager.SetFormula(fp, formula_string)
+t2.Commit()
+```
+
+If T2 fails (e.g. unit-type mismatch), roll it back and show the user the exact
+formula strings to enter manually — the parameters added in T1 are still saved.
+
 ## SharedParametersFilename gotcha
 `load_definition()` temporarily sets `app.SharedParametersFilename` to open the file,
 then **always restores it** in a `finally` block before returning.  After it returns,

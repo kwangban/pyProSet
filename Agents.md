@@ -79,6 +79,31 @@ lbf → lbm. Any other unit type → formula is a direct reference (no conversio
 `Weight_per_foot` and similar are intentionally excluded; they will be handled
 by a future button.
 
+## Two-Transaction Pattern for AddParameter + SetFormula
+Revit requires a transaction commit before newly-added parameters can be
+referenced in formulas.  Use two transactions and re-fetch parameter handles
+between them:
+
+```python
+# T1 — add parameters, then commit
+t1 = DB.Transaction(doc, "Add Parameters")
+t1.Start()
+doc.FamilyManager.AddParameter(defn, group, is_instance)
+t1.Commit()
+
+# Re-fetch — stale handles from inside a committed transaction are unsafe
+fp = next(p for p in doc.FamilyManager.GetParameters() if p.Definition.Name == name)
+
+# T2 — set formulas
+t2 = DB.Transaction(doc, "Set Formulas")
+t2.Start()
+doc.FamilyManager.SetFormula(fp, formula_string)
+t2.Commit()
+```
+
+If T2 fails, roll it back, save the family (parameters from T1 are kept), and
+show the user the exact formulas to enter manually in Family Types.
+
 ## SharedParametersFilename Gotcha
 `load_definition()` sets `app.SharedParametersFilename` temporarily and **always
 restores it** before returning.  After it returns, the shared parameter file is
