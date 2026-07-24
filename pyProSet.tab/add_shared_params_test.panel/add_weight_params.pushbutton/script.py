@@ -102,11 +102,18 @@ def _is_mass(fp):
 
 all_params = list(doc.FamilyManager.GetParameters())
 
-typed_weight = [fp for fp in all_params if _is_force(fp) or _is_mass(fp)]
+_OUTPUT_PARAMS = (ERP_PARAM_NAME, BOM_PARAM_NAME)
+
+typed_weight = [
+    fp for fp in all_params
+    if (_is_force(fp) or _is_mass(fp))
+    and fp.Definition.Name not in _OUTPUT_PARAMS
+]
 name_weight  = [
     fp for fp in all_params
     if 'weight' in fp.Definition.Name.lower()
     and not is_per_unit(fp.Definition.Name)
+    and fp.Definition.Name not in _OUTPUT_PARAMS
     and fp not in typed_weight
 ]
 
