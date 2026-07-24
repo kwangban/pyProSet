@@ -27,12 +27,10 @@ Each pushbutton `script.py` should:
 3. Nothing else — no business logic directly in `script.py`
 
 ## CONFIGURE block convention
-Targeted scripts (those that operate on specific parameters or files rather than
-prompting the user interactively) keep all configurable values in a clearly-labelled
-`# CONFIGURE` block at the top of `script.py`. Network paths, parameter names, and
-conversion constants belong here — never hardcoded inline. When network paths are
-not yet known, leave the placeholder strings and mark them `# CONFIGURE` so they
-are easy to find and update.
+Fixed business constants (parameter names, group names, conversion factors) live in a
+clearly-labelled `# CONFIGURE` block at the top of `script.py`. Never hardcode these
+values inline. File paths that vary per user or environment are prompted at runtime via
+`forms.pick_file()` rather than stored as constants.
 
 ## Unit testing pattern
 `lib/` modules detect the Revit API at import time (`try: from Autodesk.Revit.DB import ...`).

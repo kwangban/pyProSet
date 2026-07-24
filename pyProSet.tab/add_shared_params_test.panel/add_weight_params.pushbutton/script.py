@@ -22,12 +22,9 @@ from pyrevit import DB, forms, script
 from shared_param_utils import load_definition, make_formula  # noqa: F401 -- lib/
 
 # ---------------------------------------------------------------------------
-# CONFIGURE -- fill in once network paths are available
+# CONFIGURE -- fixed business constants (paths are prompted at runtime)
 # ---------------------------------------------------------------------------
-ERP_PARAM_FILE = r"\\server\share\CP_ERP_Params.txt"   # CONFIGURE
-BOM_PARAM_FILE = r"\\server\share\CP_BOM_Params.txt"   # CONFIGURE
-ERP_GROUP_NAME = "CP Parameters"                         # CONFIGURE
-BOM_GROUP_NAME = "CP Parameters"                         # CONFIGURE
+GROUP_NAME     = "Construction"   # group name inside both shared param files
 ERP_PARAM_NAME = "CP_ERP_Weight"
 BOM_PARAM_NAME = "CP_BOM_Weight"
 GRAVITY_CONV   = 32.174
@@ -53,6 +50,23 @@ if not doc.IsFamilyDocument:
         "Open a family document and try again.",
         exitscript=True,
     )
+
+# ---------------------------------------------------------------------------
+# Prompt for shared parameter file paths.
+# ---------------------------------------------------------------------------
+erp_file_path = forms.pick_file(
+    file_ext="txt",
+    title="Select ERP Shared Parameter File (CP_ERP_Weight)",
+)
+if not erp_file_path:
+    script.exit()
+
+bom_file_path = forms.pick_file(
+    file_ext="txt",
+    title="Select BOM Shared Parameter File (CP_BOM_Weight)",
+)
+if not bom_file_path:
+    script.exit()
 
 # ---------------------------------------------------------------------------
 # Step 1 -- Find the existing weight parameter by unit type.
@@ -124,12 +138,12 @@ try:
 
     erp_fp = _get_family_param(ERP_PARAM_NAME)
     if erp_fp is None:
-        erp_def = load_definition(app, ERP_PARAM_FILE, ERP_GROUP_NAME, ERP_PARAM_NAME)
+        erp_def = load_definition(app, erp_file_path, GROUP_NAME, ERP_PARAM_NAME)
         erp_fp = doc.FamilyManager.AddParameter(erp_def, PROP_PANEL_GROUP, IS_INSTANCE)
 
     bom_fp = _get_family_param(BOM_PARAM_NAME)
     if bom_fp is None:
-        bom_def = load_definition(app, BOM_PARAM_FILE, BOM_GROUP_NAME, BOM_PARAM_NAME)
+        bom_def = load_definition(app, bom_file_path, GROUP_NAME, BOM_PARAM_NAME)
         bom_fp = doc.FamilyManager.AddParameter(bom_def, PROP_PANEL_GROUP, IS_INSTANCE)
 
     doc.FamilyManager.SetFormula(erp_fp, make_formula(existing_name, is_force, GRAVITY_CONV))

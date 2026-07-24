@@ -21,9 +21,10 @@ Automate linking a family's existing weight parameter to the CP_ERP_Weight and
 CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
 
 **Goals:**
-- `add_weight_params` button: detects the family's existing weight parameter by unit
-  type (Force lbf or Mass lbm), adds `CP_ERP_Weight` and `CP_BOM_Weight` as shared
-  parameters, and sets formulas automatically:
+- `add_weight_params` button: prompts the user to select the ERP and BOM shared
+  parameter files via file-picker dialogs, detects the family's existing weight
+  parameter by unit type (Force lbf or Mass lbm), adds `CP_ERP_Weight` and
+  `CP_BOM_Weight` as shared parameters (group: `Construction`), and sets formulas:
   - Force source → `CP_ERP_Weight = <existing param> / 32.174`
   - Mass source  → `CP_ERP_Weight = <existing param>` (no conversion)
   - `CP_BOM_Weight = CP_ERP_Weight` (chained)
@@ -79,23 +80,6 @@ pyProSet/
 ├── CLAUDE.md                        Rules for Claude Code agents working in this repo
 └── README.md
 ```
-
----
-
-## Configuration
-
-Before using the `add_weight_params` button, fill in the `# CONFIGURE` constants
-at the top of [script.py](pyProSet.tab/add_shared_params_test.panel/add_weight_params.pushbutton/script.py):
-
-```python
-ERP_PARAM_FILE = r"\\server\share\CP_ERP_Params.txt"   # path to ERP shared param file
-BOM_PARAM_FILE = r"\\server\share\CP_BOM_Params.txt"   # path to BOM shared param file
-ERP_GROUP_NAME = "CP Parameters"                         # group name inside ERP file
-BOM_GROUP_NAME = "CP Parameters"                         # group name inside BOM file
-```
-
-`ERP_PARAM_NAME`, `BOM_PARAM_NAME`, `GRAVITY_CONV`, and `IS_INSTANCE` can also be
-adjusted here if the parameter names or conversion factor ever change.
 
 ---
 
