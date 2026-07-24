@@ -28,7 +28,10 @@ CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
   in the family editor, and sets formulas automatically.
 
   **Weight parameter detection** (in priority order):
-  1. Any parameter typed as **Force** (lbf) or **Mass** (lbm) — unit-aware, unambiguous
+  1. Any parameter typed as **Force** (lbf), **Weight / Structural** (lbf), or
+     **Mass** (lbm) — unit-aware, unambiguous. Note: Revit's "Weight" type
+     (Discipline: Structural, Type of parameter: Weight) is a distinct API type
+     from "Force" but both report in lbf and both get the `/32.174` conversion.
   2. Any parameter whose name contains **"weight"** (case-insensitive), excluding
      per-unit variants such as `Weight_per_foot` — catches `Number`-typed weight params
 

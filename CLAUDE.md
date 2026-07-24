@@ -28,12 +28,15 @@ Each pushbutton `script.py` should:
 
 ## Weight parameter detection pattern
 `add_weight_params` detects the source weight parameter in two passes:
-1. **Unit-typed first**: parameters typed as Force (lbf) or Mass (lbm) via
-   `GetSpecTypeId()` (R2022+) or `ParameterType` (pre-R2022)
+1. **Unit-typed first**: parameters typed as Force (lbf), Weight/Structural (lbf), or
+   Mass (lbm) via `GetSpecTypeId()` (R2022+) or `ParameterType` (pre-R2022).
+   **Important**: Revit's "Weight" (Discipline: Structural, Type: Weight) is a distinct
+   API type from "Force" (`SpecTypeId.Weight` vs `SpecTypeId.Force`) but both report
+   in lbf. `_is_force()` checks both.
 2. **Name-based fallback**: parameters whose name contains "weight" (case-insensitive),
    excluding per-unit suffixes (`_per_foot`, `_per_ft`, `/ft`, `_per_meter`, etc.)
 
-If the matched parameter's unit type is Force → formula applies `/ 32.174`.
+If the matched parameter's unit type is Force or Weight → formula applies `/ 32.174`.
 Per-unit variants (e.g. `Weight_per_foot`) are excluded from this button and reserved
 for a future phase.
 

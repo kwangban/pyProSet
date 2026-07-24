@@ -5,7 +5,7 @@ Workflow
 --------
 1. Prompt for ERP and BOM shared parameter file paths via file-picker dialogs.
 2. Find the family's total-weight parameter (two-pass detection):
-   a. Parameters typed as Force (lbf) or Mass (lbm) — unambiguous unit check
+   a. Parameters typed as Force (lbf), Weight/Structural (lbf), or Mass (lbm)
    b. Fallback: parameters whose name contains "Weight" (case-insensitive),
       excluding per-unit names like Weight_per_foot
 3. Transaction 1 — Add parameters:
@@ -88,7 +88,9 @@ if not bom_file_path:
 # Step 1 -- Find the total-weight parameter.
 #
 # Strategy (in priority order):
-#   1. Parameters typed as Force or Mass — unambiguous unit-aware detection.
+#   1. Parameters typed as Force, Weight/Structural, or Mass (unambiguous unit check).
+#      Note: Revit's "Weight" (Discipline: Structural) is distinct from "Force" in
+#      the API (SpecTypeId.Weight vs SpecTypeId.Force) but both report in lbf.
 #   2. Parameters whose name contains "weight" but NOT a per-unit suffix
 #      (e.g. _per_foot, _per_ft, /ft, _linear) — catches Number-typed params.
 #
@@ -96,10 +98,22 @@ if not bom_file_path:
 # by a separate button in a later phase.
 # ---------------------------------------------------------------------------
 def _is_force(fp):
-    """Return True if fp reports in lbf (Force unit type)."""
+    """Return True if fp reports in lbf (Force or Structural Weight unit type).
+
+    Revit's "Weight" (Structural discipline) is a distinct API type from "Force"
+    but both report in lbf and both require the /32.174 lbf->lbm conversion.
+    """
     if REVIT_VERSION >= 2022:
-        return fp.Definition.GetSpecTypeId() == DB.SpecTypeId.Force
-    return fp.Definition.ParameterType == DB.ParameterType.Force
+        spec = fp.Definition.GetSpecTypeId()
+        if spec == DB.SpecTypeId.Force:
+            return True
+        weight_spec = getattr(DB.SpecTypeId, 'Weight', None)
+        return weight_spec is not None and spec == weight_spec
+    pt = fp.Definition.ParameterType
+    if pt == DB.ParameterType.Force:
+        return True
+    weight_pt = getattr(DB.ParameterType, 'Weight', None)
+    return weight_pt is not None and pt == weight_pt
 
 def _is_mass(fp):
     """Return True if fp reports in lbm (Mass unit type)."""

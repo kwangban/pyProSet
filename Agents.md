@@ -68,16 +68,19 @@ No Revit installation required. Tests exercise the stub path of `lib/shared_para
 ## Weight Parameter Detection
 `add_weight_params` finds the source weight parameter in two passes:
 
-1. **Unit-typed** — parameters typed as Force (lbf) or Mass (lbm) via
-   `GetSpecTypeId()` (Revit 2022+) or `ParameterType` (pre-2022). This is
-   the preferred path; it works for properly-configured shared parameters.
+1. **Unit-typed** — parameters typed as Force (lbf), Weight/Structural (lbf), or
+   Mass (lbm) via `GetSpecTypeId()` (Revit 2022+) or `ParameterType` (pre-2022).
+   This is the preferred path; it works for properly-configured shared parameters.
+   **Note**: Revit's "Weight" (Discipline: Structural, Type of parameter: Weight)
+   is a distinct API type from "Force" (`SpecTypeId.Weight` ≠ `SpecTypeId.Force`)
+   but both report in lbf. `_is_force()` checks both.
 2. **Name-based fallback** — parameters whose name contains "weight"
    (case-insensitive), excluding per-unit suffixes: `_per_foot`, `_per_ft`,
    `/ft`, `_per_meter`, `_per_m`, `_linear`. This catches `Number`-typed
    weight parameters that have no unit metadata.
 
-If the matched parameter is Force-typed → formula divides by 32.174 to convert
-lbf → lbm. Any other unit type → formula is a direct reference (no conversion).
+If the matched parameter is Force or Weight-typed → formula divides by 32.174 to
+convert lbf → lbm. Mass-typed or other → formula is a direct reference.
 
 `Weight_per_foot` and similar are intentionally excluded; they will be handled
 by a future button.
