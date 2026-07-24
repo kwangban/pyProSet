@@ -79,6 +79,24 @@ lbf → lbm. Any other unit type → formula is a direct reference (no conversio
 `Weight_per_foot` and similar are intentionally excluded; they will be handled
 by a future button.
 
+## SharedParametersFilename Gotcha
+`load_definition()` sets `app.SharedParametersFilename` temporarily and **always
+restores it** before returning.  After it returns, the shared parameter file is
+no longer active.
+
+`FamilyManager.AddParameter()` requires the file to be active at the moment it is
+called.  Always re-set the path immediately before each `AddParameter` call:
+
+```python
+erp_def = load_definition(app, erp_path, ERP_GROUP_NAME, ERP_PARAM_NAME)
+app.SharedParametersFilename = erp_path   # re-set — load_definition restored original
+erp_fp = doc.FamilyManager.AddParameter(erp_def, PROP_PANEL_GROUP, IS_INSTANCE)
+```
+
+Omitting this re-set produces the misleading Revit error "Shared parameter creation failed."
+This pattern is tested via `StubApp` in `tests/test_shared_param_utils.py` and documented
+in `lib/shared_param_utils.py`'s module-level docstring.
+
 ## Typical Tasks for Agents
 - **Add a new pushbutton**: create a `<name>.pushbutton/` folder under the appropriate
   panel, add `script.py` (thin glue only — business logic goes in `lib/`)

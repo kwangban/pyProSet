@@ -7,6 +7,21 @@ Works in two modes:
 - Outside Revit (tests, app is None): parses the .txt file directly and
   returns stub objects with the same .Name interface.
 
+IMPORTANT — SharedParametersFilename contract
+---------------------------------------------
+load_definition() temporarily sets app.SharedParametersFilename to open the
+file, then restores it to the original value in a finally block.  This means
+after load_definition() returns, the shared parameter file is NO LONGER ACTIVE.
+
+Revit's FamilyManager.AddParameter() requires the shared parameter file to
+still be active (app.SharedParametersFilename pointing to it) at the moment it
+is called.  Callers MUST re-set app.SharedParametersFilename to the correct
+path immediately before calling AddParameter():
+
+    erp_def = load_definition(app, erp_path, group, name)
+    app.SharedParametersFilename = erp_path   # <-- re-set before AddParameter
+    erp_fp = doc.FamilyManager.AddParameter(erp_def, group, is_instance)
+
 IronPython 2.7 compatible.  No imports from pyrevit or Autodesk.Revit.DB
 at module level.
 """
@@ -18,6 +33,25 @@ try:
     _REVIT_AVAILABLE = True
 except ImportError:
     _REVIT_AVAILABLE = False
+
+
+class StubApp(object):
+    """Minimal stub for Revit's Application object.
+
+    Used in tests to exercise code paths that accept an ``app`` argument
+    without requiring a live Revit session.  Mirrors the two attributes
+    that ``load_definition`` reads and writes.
+
+    Note: when _REVIT_AVAILABLE is False (all CPython test runs), load_definition
+    takes the stub branch regardless of whether app is None or a StubApp.  Use
+    StubApp in tests to document the expected interface and to verify behaviour
+    of any future code that inspects the app object outside of Revit.
+    """
+    def __init__(self, shared_params_filename=""):
+        self.SharedParametersFilename = shared_params_filename
+
+    def OpenSharedParameterFile(self):
+        return None
 
 
 class StubExternalDefinition(object):
@@ -101,7 +135,7 @@ def load_definition(app, sp_file_path, group_name, param_name):
 
     Parameters
     ----------
-    app : Revit Application or None
+    app : Revit Application, StubApp, or None
         Pass ``__revit__.Application`` inside Revit; pass ``None`` in tests.
     sp_file_path : str
         Absolute path to the shared parameter .txt file.
@@ -114,6 +148,15 @@ def load_definition(app, sp_file_path, group_name, param_name):
     ------
     ValueError
         If the file, group, or parameter is not found.
+
+    Warning
+    -------
+    Inside Revit this function temporarily sets app.SharedParametersFilename
+    and ALWAYS restores it before returning (even on error).  After it returns,
+    the shared parameter file is no longer active.  If you need to call
+    FamilyManager.AddParameter() with the returned definition, you must
+    re-set app.SharedParametersFilename = sp_file_path before that call.
+    See the module-level docstring for a usage example.
     """
     if _REVIT_AVAILABLE and app is not None:
         old_path = app.SharedParametersFilename
@@ -121,6 +164,8 @@ def load_definition(app, sp_file_path, group_name, param_name):
             app.SharedParametersFilename = sp_file_path
             sp_file = app.OpenSharedParameterFile()
         finally:
+            # Always restore so the caller's shared param state is not disturbed.
+            # Consequence: AddParameter requires the caller to re-set the path.
             app.SharedParametersFilename = old_path or ""
         if sp_file is None:
             raise ValueError(

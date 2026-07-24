@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 
-from shared_param_utils import StubSharedParamFile, load_definition, make_formula, is_per_unit
+from shared_param_utils import StubSharedParamFile, StubApp, load_definition, make_formula, is_per_unit
 
 SAMPLE_SP = (
     "*META\tVERSION\tMINVERSION\n"
@@ -103,6 +103,41 @@ class TestStubSharedParamFile:
         stub = StubSharedParamFile(str(sp))
         group_a = next(g for g in stub.Groups if g.Name == "GroupA")
         assert group_a.Definitions[0].Name == "ParamA"
+
+
+class TestLoadDefinitionPathRestoration:
+    """Document the SharedParametersFilename contract.
+
+    In CPython (no Revit), _REVIT_AVAILABLE is False, so load_definition always
+    takes the stub branch and never touches app.SharedParametersFilename.  These
+    tests use StubApp to verify the interface and to pin the expected behaviour
+    for the Revit path: after load_definition returns, the caller must re-set
+    app.SharedParametersFilename before calling FamilyManager.AddParameter().
+    """
+
+    def test_stub_app_accepted_without_error(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(SAMPLE_SP)
+        app = StubApp(shared_params_filename="original_path")
+        defn = load_definition(app, str(sp), "TEST", "TEST_weight")
+        assert defn.Name == "TEST_weight"
+
+    def test_stub_app_filename_unchanged_after_call(self, tmp_path):
+        # In stub mode (CPython), load_definition never touches the filename.
+        # In Revit mode it would restore it — this test documents that the
+        # contract is "filename is the same before and after the call".
+        sp = tmp_path / "params.txt"
+        sp.write_text(SAMPLE_SP)
+        app = StubApp(shared_params_filename="original_path")
+        load_definition(app, str(sp), "TEST", "TEST_weight")
+        assert app.SharedParametersFilename == "original_path"
+
+    def test_stub_app_raises_on_missing_param(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(SAMPLE_SP)
+        app = StubApp()
+        with pytest.raises(ValueError, match="Parameter 'MISSING'"):
+            load_definition(app, str(sp), "TEST", "MISSING")
 
 
 class TestLoadDefinition:

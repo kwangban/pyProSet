@@ -52,5 +52,21 @@ Note the distinction between two types of "group name":
 ## Unit testing pattern
 `lib/` modules detect the Revit API at import time (`try: from Autodesk.Revit.DB import ...`).
 When the import fails (outside Revit), stubs defined in the same file are used instead.
-Tests call `lib/` functions with `app=None` to exercise the stub path.
+Tests call `lib/` functions with `app=None` or `app=StubApp()` to exercise the stub path.
 Do not introduce mocking libraries or additional pip packages.
+
+## SharedParametersFilename gotcha
+`load_definition()` temporarily sets `app.SharedParametersFilename` to open the file,
+then **always restores it** in a `finally` block before returning.  After it returns,
+the shared parameter file is no longer active.
+
+Revit's `FamilyManager.AddParameter()` requires the file to still be active at call
+time.  Always re-set the path immediately before `AddParameter`:
+
+```python
+erp_def = load_definition(app, erp_path, group, name)
+app.SharedParametersFilename = erp_path   # re-set — load_definition restored the original
+erp_fp = doc.FamilyManager.AddParameter(erp_def, group, is_instance)
+```
+
+Forgetting this step produces the misleading error "Shared parameter creation failed."
