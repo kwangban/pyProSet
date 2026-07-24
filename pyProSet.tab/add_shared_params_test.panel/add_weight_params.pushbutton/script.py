@@ -93,14 +93,32 @@ weight_candidates = [
     if _unit_kind(fp) is not None
 ]
 
-if not weight_candidates:
-    forms.alert(
-        "No Force or Mass parameter found in this family.\n"
-        "Add a weight parameter first, then run this button.",
-        exitscript=True,
-    )
+all_params = list(doc.FamilyManager.GetParameters())
 
-if len(weight_candidates) == 1:
+if not weight_candidates:
+    # Auto-detection found no Force/Mass parameters — let the user pick manually.
+    all_names = [fp.Definition.Name for fp in all_params]
+    chosen_name = forms.ask_for_one_item(
+        all_names,
+        prompt=(
+            "No Force or Mass parameter was auto-detected.\n"
+            "Select the parameter that holds the weight value:"
+        ),
+        title="Select Weight Parameter",
+    )
+    if not chosen_name:
+        script.exit()
+    source_fp = next(fp for fp in all_params if fp.Definition.Name == chosen_name)
+    unit_choice = forms.ask_for_one_item(
+        ["lbf (Force — divide by 32.174 to get lbm)", "lbm (Mass — no conversion needed)"],
+        prompt="What unit does '{}' report in?".format(chosen_name),
+        title="Select Unit Type",
+    )
+    if not unit_choice:
+        script.exit()
+    source_kind = 'force' if unit_choice.startswith('lbf') else 'mass'
+
+elif len(weight_candidates) == 1:
     source_fp, source_kind = weight_candidates[0]
 else:
     names = [fp.Definition.Name for fp, _ in weight_candidates]
