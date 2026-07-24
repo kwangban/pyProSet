@@ -55,6 +55,22 @@ When the import fails (outside Revit), stubs defined in the same file are used i
 Tests call `lib/` functions with `app=None` or `app=StubApp()` to exercise the stub path.
 Do not introduce mocking libraries or additional pip packages.
 
+## Instance/type matching for formula compatibility
+When adding a parameter whose formula will reference an existing family parameter,
+use `source_fp.IsInstance` to match the instance/type level:
+
+```python
+is_instance = source_fp.IsInstance
+doc.FamilyManager.AddParameter(defn, group, is_instance)
+```
+
+Revit's formula engine enforces that type-level parameters can only reference
+other type-level parameters.  Creating a new parameter at the wrong level causes
+`SetFormula` to reject the reference as an invalid formula string.
+
+`IS_INSTANCE = True` in the CONFIGURE block documents the intended default;
+the runtime value is always overridden by `source_fp.IsInstance`.
+
 ## Two-transaction pattern for AddParameter + SetFormula
 Revit requires a transaction commit before newly-added parameters can be referenced
 in formulas.  Always use two separate transactions:

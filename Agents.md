@@ -79,6 +79,22 @@ lbf → lbm. Any other unit type → formula is a direct reference (no conversio
 `Weight_per_foot` and similar are intentionally excluded; they will be handled
 by a future button.
 
+## Instance/Type Matching for Formula Compatibility
+When adding a parameter whose formula will reference an existing family parameter,
+mirror the source parameter's instance/type level:
+
+```python
+is_instance = source_fp.IsInstance
+doc.FamilyManager.AddParameter(defn, group, is_instance)
+```
+
+Revit's formula engine enforces level consistency: a type-level formula cannot
+reference an instance parameter, and creating the target at the wrong level
+produces the misleading "invalid formula string" error from `SetFormula`.
+
+`IS_INSTANCE = True` in the CONFIGURE block is a documented default only;
+the runtime value is always derived from `source_fp.IsInstance`.
+
 ## Two-Transaction Pattern for AddParameter + SetFormula
 Revit requires a transaction commit before newly-added parameters can be
 referenced in formulas.  Use two transactions and re-fetch parameter handles

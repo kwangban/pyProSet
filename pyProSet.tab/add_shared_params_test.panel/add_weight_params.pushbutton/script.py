@@ -12,6 +12,8 @@ Workflow
    - CP_ERP_Weight from group "Enterprise Resource Planning" in the ERP file
    - CP_BOM_Weight from group "CP_BOM_Reporting" in the BOM file
    - Both placed under the Construction group in the family editor
+   - Instance/type setting mirrors the source parameter (IsInstance) so that
+     formula references stay at the same level (type→type or instance→instance)
 4. Transaction 2 — Set formulas (separate from step 3; Revit requires a commit
    before new parameters can be referenced in formulas):
    - Force source : CP_ERP_Weight = <existing> / 32.174  (lbf -> lbm)
@@ -37,7 +39,7 @@ BOM_GROUP_NAME = "CP_BOM_Reporting"               # group inside BOM shared para
 ERP_PARAM_NAME = "CP_ERP_Weight"
 BOM_PARAM_NAME = "CP_BOM_Weight"
 GRAVITY_CONV   = 32.174
-IS_INSTANCE    = True
+IS_INSTANCE    = True   # default; overridden at runtime to match source parameter
 # ---------------------------------------------------------------------------
 
 app = __revit__.Application                # noqa: F821
@@ -143,6 +145,10 @@ else:
 
 existing_name = source_fp.Definition.Name
 is_force = _is_force(source_fp)
+# Mirror the source parameter's instance/type setting so formula references
+# are at the same level.  A type-level formula cannot reference an instance
+# parameter, and vice versa.
+is_instance = source_fp.IsInstance
 
 # ---------------------------------------------------------------------------
 # Step 2 -- Add CP_ERP_Weight and CP_BOM_Weight (Transaction 1).
@@ -169,13 +175,13 @@ try:
         # load_definition restores SharedParametersFilename after parsing, but
         # AddParameter requires the file to still be active — re-set it here.
         app.SharedParametersFilename = erp_file_path
-        erp_fp = doc.FamilyManager.AddParameter(erp_def, PROP_PANEL_GROUP, IS_INSTANCE)
+        erp_fp = doc.FamilyManager.AddParameter(erp_def, PROP_PANEL_GROUP, is_instance)
 
     bom_fp = _get_family_param(BOM_PARAM_NAME)
     if bom_fp is None:
         bom_def = load_definition(app, bom_file_path, BOM_GROUP_NAME, BOM_PARAM_NAME)
         app.SharedParametersFilename = bom_file_path
-        bom_fp = doc.FamilyManager.AddParameter(bom_def, PROP_PANEL_GROUP, IS_INSTANCE)
+        bom_fp = doc.FamilyManager.AddParameter(bom_def, PROP_PANEL_GROUP, is_instance)
 
     t1.Commit()
 
