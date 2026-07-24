@@ -17,8 +17,15 @@ Workflow
    - Force source : CP_ERP_Weight = <existing> / 32.174  (lbf -> lbm)
    - Other source : CP_ERP_Weight = <existing>  (no conversion)
    - CP_BOM_Weight = CP_ERP_Weight  (chained)
-   If formula setting fails (e.g. unit-type mismatch), the parameters are still
-   saved and the user is shown the exact formulas to enter manually.
+   If formula setting fails, the parameters are still saved and the user is
+   shown a diagnostic message explaining the type mismatch and how to fix it.
+
+Type compatibility
+------------------
+CP_ERP_Weight must have the same unit type as the source weight parameter for
+Revit to accept a formula. If the source is NUMBER (dimensionless) but
+CP_ERP_Weight is MASS in the shared parameter file, Revit rejects the formula.
+Fix: change CP_ERP_Weight's DATATYPE in the ERP .txt file from MASS to NUMBER.
 
 Version compatibility
 ---------------------
@@ -142,6 +149,13 @@ else:
 existing_name = source_fp.Definition.Name
 is_force = _is_force(source_fp)
 
+if is_force:
+    source_type_desc = "Force (lbf)"
+elif _is_mass(source_fp):
+    source_type_desc = "Mass (lbm)"
+else:
+    source_type_desc = "Number / dimensionless (no unit type)"
+
 # ---------------------------------------------------------------------------
 # Step 2 -- Add CP_ERP_Weight and CP_BOM_Weight (Transaction 1).
 #
@@ -237,14 +251,24 @@ if formula_success:
 else:
     forms.alert(
         "Parameters added to Construction group.\n\n"
-        "Formulas could not be set automatically:\n{}\n\n"
-        "Please enter these formulas manually in Family Types:\n\n"
+        "Formulas could not be set automatically.\n\n"
+        "Likely cause: '{src}' is typed as {src_type}. "
+        "If {erp} is defined as MASS in the ERP shared parameter file, "
+        "Revit rejects the formula because the types are incompatible "
+        "(cannot assign {src_type} to MASS).\n\n"
+        "Revit error: {err}\n\n"
+        "To fix permanently:\n"
+        "  Open the ERP shared parameter .txt file and change {erp}'s\n"
+        "  DATATYPE from MASS to NUMBER, then re-run this button.\n\n"
+        "Manual formulas (Family Types -> Manage tab):\n\n"
         "  {erp} = {formula}\n"
         "  {bom} = {erp}".format(
-            formula_error,
+            src=existing_name,
+            src_type=source_type_desc,
             erp=ERP_PARAM_NAME,
             formula=erp_formula,
             bom=BOM_PARAM_NAME,
+            err=formula_error,
         ),
-        title="Parameters Added — Enter Formulas Manually",
+        title="Parameters Added - Type Mismatch, Enter Formulas Manually",
     )

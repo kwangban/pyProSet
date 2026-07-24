@@ -98,3 +98,14 @@ erp_fp = doc.FamilyManager.AddParameter(erp_def, group, is_instance)
 ```
 
 Forgetting this step produces the misleading error "Shared parameter creation failed."
+
+## Formula type mismatch
+Revit's formula engine enforces dimensional consistency. If the source weight
+parameter is `NUMBER` (dimensionless — falls to name-based detection, not
+unit-typed) and `CP_ERP_Weight` is defined as `MASS` in the ERP shared parameter
+file, Revit rejects the formula with "invalid formula string."
+
+**Fix**: open the ERP `.txt` file and change `CP_ERP_Weight`'s `DATATYPE` column
+from `MASS` to `NUMBER`. After that change, re-running the button will set formulas
+automatically. The `StubExternalDefinition.DataType` attribute exposes this field
+in tests (read from column 4 of the `PARAM` line).

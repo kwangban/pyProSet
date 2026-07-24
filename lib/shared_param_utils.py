@@ -55,8 +55,9 @@ class StubApp(object):
 
 
 class StubExternalDefinition(object):
-    def __init__(self, name):
+    def __init__(self, name, data_type=""):
         self.Name = name
+        self.DataType = data_type  # e.g. "MASS", "FORCE", "NUMBER" — from PARAM col 4
 
 
 class StubDefinitionGroup(object):
@@ -88,11 +89,12 @@ class StubSharedParamFile(object):
                 elif line.startswith('PARAM\t'):
                     parts = line.split('\t')
                     param_name = parts[2]
+                    param_data_type = parts[3] if len(parts) > 3 else ""
                     group_id = parts[5]
                     group_name = group_map.get(group_id)
                     if group_name:
                         param_groups[group_name].append(
-                            StubExternalDefinition(param_name)
+                            StubExternalDefinition(param_name, param_data_type)
                         )
 
         self.Groups = [

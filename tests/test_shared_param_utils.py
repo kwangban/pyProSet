@@ -118,6 +118,24 @@ class TestStubSharedParamFile:
         group_a = next(g for g in stub.Groups if g.Name == "GroupA")
         assert group_a.Definitions[0].Name == "ParamA"
 
+    def test_param_data_type_parsed(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(SAMPLE_SP)  # SAMPLE_SP defines MASS for TEST_weight
+        stub = StubSharedParamFile(str(sp))
+        assert stub.Groups[0].Definitions[0].DataType == "MASS"
+
+    def test_param_data_type_number(self, tmp_path):
+        minimal = (
+            "*GROUP\tID\tNAME\n"
+            "GROUP\t1\tG\n"
+            "*PARAM\tGUID\tNAME\tDATATYPE\tDATACATEGORY\tGROUP\tVISIBLE\tDESCRIPTION\tUSERMODIFIABLE\n"
+            "PARAM\tguid\tP\tNUMBER\t\t1\t1\t\t1\n"
+        )
+        sp = tmp_path / "p.txt"
+        sp.write_text(minimal)
+        stub = StubSharedParamFile(str(sp))
+        assert stub.Groups[0].Definitions[0].DataType == "NUMBER"
+
 
 class TestLoadDefinitionPathRestoration:
     """Document the SharedParametersFilename contract.

@@ -105,7 +105,14 @@ t2.Commit()
 ```
 
 If T2 fails, roll it back, save the family (parameters from T1 are kept), and
-show the user the exact formulas to enter manually in Family Types.
+show the user a diagnostic message with the source parameter's type, the likely
+mismatch explanation, the fix (change DATATYPE in the ERP `.txt` file), and the
+manual formula strings.
+
+**Common T2 failure — type mismatch**: if the source weight param is `NUMBER`
+(dimensionless) but `CP_ERP_Weight` is `MASS` in the shared param file, Revit
+rejects any formula assignment. Fix: change CP_ERP_Weight's `DATATYPE` to
+`NUMBER` in the ERP `.txt` file.
 
 ## SharedParametersFilename Gotcha
 `load_definition()` sets `app.SharedParametersFilename` temporarily and **always

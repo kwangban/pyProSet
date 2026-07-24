@@ -41,10 +41,12 @@ CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
 
   Both parameters are added as **instance parameters**. Parameters and formulas
   are set in **two separate transactions** (Revit requires a commit before new
-  parameters can be referenced in formulas). If formula setting fails (e.g.
-  unit-type mismatch between the source and the shared parameter definition),
-  the parameters are still saved and the button shows the exact formulas to
-  enter manually in Family Types.
+  parameters can be referenced in formulas). If formula setting fails, the
+  parameters are still saved and the button shows a diagnostic message that
+  names the source parameter's type, explains the mismatch, and gives the exact
+  fix: if `CP_ERP_Weight` is `MASS` in the ERP shared parameter file but the
+  source is a dimensionless `NUMBER`, change the DATATYPE to `NUMBER` in the
+  `.txt` file and re-run the button.
 
   Per-unit parameters such as `Weight_per_foot` are intentionally excluded and will
   be handled by a separate button in a later phase.
