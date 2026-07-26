@@ -15,52 +15,77 @@ backed by a testable, CI-friendly Python library that runs outside Revit.
 
 ## Roadmap
 
-### Phase 1 — Weight Parameter Linking *(in progress)*
+### Phase 1 — CSV-Driven Shared Parameter Import *(in progress)*
 
-Automate linking a family's existing weight parameter to the CP_ERP_Weight and
-CP_BOM_Weight shared parameters required by downstream ERP and BOM systems.
+Import any set of CP shared parameters into an open family from a single shared
+parameter file. The parameter list is defined in a user-editable CSV — no Python
+changes needed when the list grows or changes.
 
-**Goals:**
-- `add_weight_params` button: prompts the user to select the ERP and BOM shared
-  parameter files via file-picker dialogs, finds the family's total-weight parameter,
-  adds `CP_ERP_Weight` (from group `Enterprise Resource Planning`) and `CP_BOM_Weight`
-  (from group `CP_BOM_Reporting`) as shared parameters, places both under `Construction`
-  in the family editor, and sets formulas automatically.
+**Button: `add_stratus_params`**
 
-  **Weight parameter detection** (in priority order):
-  1. Any parameter typed as **Force** (lbf), **Weight / Structural** (lbf), or
-     **Mass** (lbm) — unit-aware, unambiguous. Note: Revit's "Weight" type
-     (Discipline: Structural, Type of parameter: Weight) is a distinct API type
-     from "Force" but both report in lbf and both get the `/32.174` conversion.
-  2. Any parameter whose name contains **"weight"** (case-insensitive), excluding
-     per-unit variants such as `Weight_per_foot` — catches `Number`-typed weight params
+1. Prompts the user to select:
+   - A Revit shared parameter `.txt` file (all parameters must exist in this file)
+   - A CSV file defining which parameters to import (sample: `sample_params/CP_Parameters.csv`)
+2. Reads the CSV (`Name`, `DataType`, `Instance`, `Group` columns).
+3. Skips any parameter that already exists in the family.
+4. Imports missing parameters from the shared parameter file (searching all groups).
+5. For each newly added non-Text parameter, searches existing family parameters by
+   keyword (derived from the CP_* name) and sets a formula automatically:
+   - `CP_Weight` → matches family's weight parameter; divides by 32.174 if source is lbf
+   - `CP_Weight_Per_Foot` → matches per-unit weight parameter; direct reference
+   - Other numeric types → keyword match on name suffix; direct reference
+   - If multiple candidates match, the user picks from a dialog.
+   - If no candidate is found, the parameter is noted in the report for manual formula entry.
+6. Saves the family and reports: added, skipped, formulas set, and manual-entry-needed.
 
-  If more than one candidate is found after filtering, the user is prompted to pick.
+**CSV format (`sample_params/CP_Parameters.csv`):**
 
-  **Formula logic:**
-  - Parameter reports in **lbf** (Force type) → `CP_ERP_Weight = <param> / 32.174`
-  - Any other unit (lbm, Number, etc.) → `CP_ERP_Weight = <param>` (no conversion)
-  - `CP_BOM_Weight = CP_ERP_Weight` (chained)
+```csv
+Name,DataType,Instance,Group
+CP_Weight,Mass,Yes,Construction
+CP_Weight_Per_Foot,Mass per Unit Length,Yes,Construction
+CP_Length,Length,No,Constraints
+CP_Size,Text,No,Constraints
+CP_Description,Text,No,Identity Data
+...
+```
 
-  Both parameters are added as **instance parameters**. Parameters and formulas
-  are set in **two separate transactions** (Revit requires a commit before new
-  parameters can be referenced in formulas). If formula setting fails, the
-  parameters are still saved and the button shows a diagnostic message that
-  names the source parameter's type, explains the mismatch, and gives the exact
-  fix: if `CP_ERP_Weight` is `MASS` in the ERP shared parameter file but the
-  source is a dimensionless `NUMBER`, change the DATATYPE to `NUMBER` in the
-  `.txt` file and re-run the button.
+- `Instance`: `Yes` or `No` (case-insensitive)
+- `Group`: one of `Constraints`, `Construction`, `Set`, `Data`, `Identity Data`
+  (case-insensitive; unknown values fall back to `Construction`)
+- `DataType`: used only for formula conversion logic (actual Revit type comes from the `.txt` file)
 
-  Per-unit parameters such as `Weight_per_foot` are intentionally excluded and will
-  be handled by a separate button in a later phase.
-- `lib/shared_param_utils.py`: stub-aware parser for the Revit shared parameter `.txt`
-  format and a pure-Python `make_formula()` helper — both testable without Revit
-- `tests/`: pytest suite covering the parser and formula logic (stub mode, no Revit required)
+**Group meanings:**
+
+| Group | Used for |
+|---|---|
+| Constraints | User-editable parameters |
+| Construction | Report-only / calculated parameters |
+| Set | Backend parameters (not for direct user interaction) |
+| Data | Specialty parameters (e.g. GPT/AI parameters) |
+| Identity Data | Sheet-related parameters |
+
+**Weight parameter detection (for formula chaining):**
+
+Any parameter typed as Force (lbf), Structural Weight (lbf), or Mass (lbm), or whose
+name contains "weight" (case-insensitive), excluding per-unit variants like
+`Weight_per_foot`. If the source reports in lbf, the formula divides by 32.174.
+Both Force and Weight (Structural) require this conversion — they are distinct Revit
+API types (`SpecTypeId.Force` vs `SpecTypeId.Weight`) but both report in lbf.
+
+**Transaction pattern:**
+
+Parameters are added in T1, formulas set in T2. If T2 fails (e.g. unit-type mismatch),
+T2 rolls back but T1 results are kept. The report lists formulas that need manual entry.
+
+- `lib/shared_param_utils.py`: stub-aware parser for Revit shared param `.txt` files,
+  `parse_param_csv()`, `find_definition()`, `make_formula()` — all testable without Revit
+- `tests/`: pytest suite (56 tests) covering parser, CSV reader, and formula logic
 
 **Definition of done:** Phase 1 is complete when:
 - All `tests/` pass in a plain Python environment (`pytest tests/ -v`)
-- The `add_weight_params` button correctly adds and links parameters in an open `.rfa`
-- A push to this repo is reflected in Revit after a pyRevit reload (end-to-end Git loop confirmed)
+- The `add_stratus_params` button correctly imports and links parameters in an open `.rfa`
+- A push to this repo is reflected in Revit after a pyRevit reload
 
 ---
 
@@ -91,17 +116,19 @@ Bulk operations that set up a full Revit project from a configuration template.
 pyProSet/
 ├── pyProSet.tab/                    pyRevit extension — tabs at repo root for direct clone
 │   ├── add_shared_params_test.panel/
-│   │   └── add_weight_params.pushbutton/
-│   │       ├── script.py            Detects weight param, adds CP_ERP/BOM_Weight, sets formulas
+│   │   └── add_stratus_params.pushbutton/
+│   │       ├── script.py            CSV-driven parameter import; adds params and sets formulas
 │   │       └── icon.png
 │   └── key_plan.panel/
 │       └── Types.pushbutton/
 │           ├── script.py
 │           └── icon.png
 ├── lib/
-│   └── shared_param_utils.py        Stub-aware parser + make_formula() — works in and out of Revit
+│   └── shared_param_utils.py        Stub-aware parser + CSV reader + make_formula()
 ├── tests/
-│   └── test_shared_param_utils.py
+│   └── test_shared_param_utils.py   56 tests; runs in CPython without Revit
+├── sample_params/
+│   └── CP_Parameters.csv            Starter CSV with 16 CP_* parameters
 ├── CLAUDE.md                        Rules for Claude Code agents working in this repo
 └── README.md
 ```
@@ -121,7 +148,7 @@ No Revit installation required. Tests run on the stub path of `lib/shared_param_
 
 ### Installing the pyRevit Extension
 
-In Revit: **pyRevit tab → Settings → Extensions → Add extension from URL**
+In Revit: **pyRevit tab -> Settings -> Extensions -> Add extension from URL**
 
 URL: `https://github.com/kwangban/pyProSet.git`
 
@@ -134,6 +161,6 @@ pyRevit reload — no manual file copying needed.
 1. Edit scripts in `pyProSet.tab/` or `lib/` locally
 2. Run `pytest tests/ -v` — confirm all tests pass
 3. Push to `main`
-4. In Revit: pyRevit tab → Reload (or close/reopen Revit)
+4. In Revit: pyRevit tab -> Reload (or close/reopen Revit)
 
 The button updates automatically.

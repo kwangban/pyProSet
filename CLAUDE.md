@@ -19,6 +19,8 @@ be IronPython-compatible so the same code runs in both Revit and tests:
   No imports from `pyrevit`, `Autodesk.Revit.DB`, or any package not in stdlib here
   (stubs handle the Revit API boundary; see `lib/shared_param_utils.py`).
 - `tests/` — pytest suite that runs in CPython 3. Only `pytest` is required; no extra deps.
+- `sample_params/` — starter CSV files for end users. `CP_Parameters.csv` lists the 16
+  default CP_* parameters used with `add_stratus_params`.
 
 ## script.py files are thin glue
 Each pushbutton `script.py` should:
@@ -26,35 +28,39 @@ Each pushbutton `script.py` should:
 2. Then call Revit API via pyRevit (`from pyrevit import DB, forms`)
 3. Nothing else — no business logic directly in `script.py`
 
-## Weight parameter detection pattern
-`add_weight_params` detects the source weight parameter in two passes:
-1. **Unit-typed first**: parameters typed as Force (lbf), Weight/Structural (lbf), or
-   Mass (lbm) via `GetSpecTypeId()` (R2022+) or `ParameterType` (pre-R2022).
-   **Important**: Revit's "Weight" (Discipline: Structural, Type: Weight) is a distinct
-   API type from "Force" (`SpecTypeId.Weight` vs `SpecTypeId.Force`) but both report
-   in lbf. `_is_force()` checks both.
-2. **Name-based fallback**: parameters whose name contains "weight" (case-insensitive),
-   excluding per-unit suffixes (`_per_foot`, `_per_ft`, `/ft`, `_per_meter`, etc.)
+## CSV-driven parameter import (add_stratus_params)
+The `add_stratus_params` button reads which parameters to import from a user-selected CSV.
+CSV columns: `Name`, `DataType`, `Instance` (Yes/No), `Group`.
 
-If the matched parameter's unit type is Force or Weight → formula applies `/ 32.174`.
-Per-unit variants (e.g. `Weight_per_foot`) are excluded from this button and reserved
-for a future phase.
+**Group -> Revit API mapping** (version-aware; unknown names fall back to Construction):
+
+| CSV Group    | Pre-2022                              | 2022+                        |
+|---|---|---|
+| Constraints  | PG_CONSTRAINTS                        | GroupTypeId.Constraints      |
+| Construction | PG_CONSTRUCTION                       | GroupTypeId.Construction     |
+| Set          | PG_SETS                               | GroupTypeId.Sets             |
+| Data         | PG_DATA                               | GroupTypeId.Data             |
+| Identity Data| PG_IDENTITY_DATA                      | GroupTypeId.IdentityData     |
+
+`find_definition()` (not `load_definition()`) is used in this button — it searches ALL
+groups in the `.txt` file so the caller does not need to know which group a parameter
+belongs to.
+
+## Weight parameter detection pattern
+`add_stratus_params` detects a formula source by keyword matching:
+- Strip the `CP_` prefix and lowercase the suffix to get the keyword.
+- Match against existing family parameter names (substring, case-insensitive).
+- Exclude output parameters (`is_output_param()` with the frozenset from the CSV).
+- Respect per-unit flag: `is_per_unit()` must match between candidate and target
+  (e.g. `CP_Weight_Per_Foot` only matches per-unit candidates).
+- **Revit's "Weight" (Discipline: Structural, Type: Weight)** is a distinct API type
+  from "Force" (`SpecTypeId.Weight` vs `SpecTypeId.Force`) but both report in lbf.
+  `_is_force()` checks both.
+- Apply `/32.174` only when: target DataType is `mass` AND source `_is_force()` is True.
 
 ## CONFIGURE block convention
-Fixed business constants (parameter names, group names, conversion factors) live in a
-clearly-labelled `# CONFIGURE` block at the top of `script.py`. Never hardcode these
-values inline. File paths that vary per user or environment are prompted at runtime via
-`forms.pick_file()` rather than stored as constants.
-
-Note the distinction between two types of "group name":
-- **Shared param file group** (`ERP_GROUP_NAME`, `BOM_GROUP_NAME`): the group name as
-  it appears inside the `.txt` file (e.g. `"Enterprise Resource Planning"`, `"CP_BOM_Reporting"`)
-- **Family editor group** (`PROP_PANEL_GROUP`): the Revit UI group where the parameter
-  appears in the family properties panel (currently `Construction`)
-
-`IS_INSTANCE = True` — `CP_ERP_Weight` and `CP_BOM_Weight` are always added as
-instance parameters regardless of whether the source weight parameter is a type
-or instance parameter.
+Fixed business constants (conversion factors) live in a `# CONFIGURE` block at the top
+of `script.py`. File paths that vary per user are prompted at runtime via `forms.pick_file()`.
 
 ## Unit testing pattern
 `lib/` modules detect the Revit API at import time (`try: from Autodesk.Revit.DB import ...`).
@@ -64,13 +70,13 @@ Do not introduce mocking libraries or additional pip packages.
 
 ## Two-transaction pattern for AddParameter + SetFormula
 Revit requires a transaction commit before newly-added parameters can be referenced
-in formulas.  Always use two separate transactions:
+in formulas. Always use two separate transactions:
 
 ```python
 # T1 — add parameters
 t1 = DB.Transaction(doc, "Add Parameters")
 t1.Start()
-fp = doc.FamilyManager.AddParameter(defn, group, is_instance)
+doc.FamilyManager.AddParameter(defn, group, is_instance)
 t1.Commit()
 
 # Re-fetch handle — stale handles from inside a committed transaction are unsafe
@@ -83,32 +89,30 @@ doc.FamilyManager.SetFormula(fp, formula_string)
 t2.Commit()
 ```
 
-If T2 fails (e.g. unit-type mismatch), roll it back and show the user the exact
-formula strings to enter manually — the parameters added in T1 are still saved.
+If T2 fails (e.g. unit-type mismatch), roll it back and report which formulas need
+manual entry — the parameters added in T1 are still saved.
 
 ## SharedParametersFilename gotcha
-`load_definition()` temporarily sets `app.SharedParametersFilename` to open the file,
-then **always restores it** in a `finally` block before returning.  After it returns,
-the shared parameter file is no longer active.
+`load_definition()` and `find_definition()` temporarily set `app.SharedParametersFilename`
+to open the file, then **always restore it** in a `finally` block before returning.
+After they return, the shared parameter file is no longer active.
 
 Revit's `FamilyManager.AddParameter()` requires the file to still be active at call
-time.  Always re-set the path immediately before `AddParameter`:
+time. Always re-set the path immediately before each `AddParameter`:
 
 ```python
-erp_def = load_definition(app, erp_path, group, name)
-app.SharedParametersFilename = erp_path   # re-set — load_definition restored the original
-erp_fp = doc.FamilyManager.AddParameter(erp_def, group, is_instance)
+defn = find_definition(app, sp_path, param_name)
+app.SharedParametersFilename = sp_path   # re-set — find_definition restored original
+fp = doc.FamilyManager.AddParameter(defn, group, is_instance)
 ```
 
 Forgetting this step produces the misleading error "Shared parameter creation failed."
 
 ## Formula type mismatch
-Revit's formula engine enforces dimensional consistency. If the source weight
-parameter is `NUMBER` (dimensionless — falls to name-based detection, not
-unit-typed) and `CP_ERP_Weight` is defined as `MASS` in the ERP shared parameter
-file, Revit rejects the formula with "invalid formula string."
+Revit's formula engine enforces dimensional consistency. If the source parameter is
+dimensionless (`NUMBER`) and the target is `MASS` in the shared param file, Revit
+rejects the formula with "invalid formula string."
 
-**Fix**: open the ERP `.txt` file and change `CP_ERP_Weight`'s `DATATYPE` column
-from `MASS` to `NUMBER`. After that change, re-running the button will set formulas
-automatically. The `StubExternalDefinition.DataType` attribute exposes this field
-in tests (read from column 4 of the `PARAM` line).
+Fix: open the `.txt` file and change the target parameter's `DATATYPE` from `MASS`
+to `NUMBER`. The `StubExternalDefinition.DataType` attribute exposes this field in
+tests (read from column 4 of the `PARAM` line).

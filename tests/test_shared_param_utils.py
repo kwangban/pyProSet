@@ -5,7 +5,17 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 
-from shared_param_utils import StubSharedParamFile, StubApp, load_definition, make_formula, is_per_unit, is_output_param, is_force_like_datatype
+from shared_param_utils import (
+    StubSharedParamFile,
+    StubApp,
+    load_definition,
+    find_definition,
+    make_formula,
+    is_per_unit,
+    is_output_param,
+    is_force_like_datatype,
+    parse_param_csv,
+)
 
 SAMPLE_SP = (
     "*META\tVERSION\tMINVERSION\n"
@@ -62,7 +72,7 @@ class TestIsForceLikeDatatype:
         assert is_force_like_datatype("FORCE") is True
 
     def test_weight_is_force_like(self):
-        # Structural Weight type also reports in lbf — needs /32.174 conversion
+        # Structural Weight type also reports in lbf -- needs /32.174 conversion
         assert is_force_like_datatype("WEIGHT") is True
 
     def test_mass_is_not_force_like(self):
@@ -76,17 +86,21 @@ class TestIsForceLikeDatatype:
 
 
 class TestIsOutputParam:
-    def test_erp_weight_is_output(self):
-        assert is_output_param("CP_ERP_Weight") is True
+    def test_cp_weight_is_output(self):
+        names = frozenset(["CP_Weight", "CP_Length"])
+        assert is_output_param("CP_Weight", names) is True
 
-    def test_bom_weight_is_output(self):
-        assert is_output_param("CP_BOM_Weight") is True
+    def test_cp_length_is_output(self):
+        names = frozenset(["CP_Weight", "CP_Length"])
+        assert is_output_param("CP_Length", names) is True
 
     def test_plain_weight_is_not_output(self):
-        assert is_output_param("Weight") is False
+        names = frozenset(["CP_Weight", "CP_Length"])
+        assert is_output_param("Weight", names) is False
 
     def test_check_is_case_sensitive(self):
-        assert is_output_param("cp_erp_weight") is False
+        names = frozenset(["CP_Weight"])
+        assert is_output_param("cp_weight", names) is False
 
 
 class TestMakeFormula:
@@ -138,7 +152,7 @@ class TestStubSharedParamFile:
 
     def test_param_data_type_parsed(self, tmp_path):
         sp = tmp_path / "params.txt"
-        sp.write_text(SAMPLE_SP)  # SAMPLE_SP defines MASS for TEST_weight
+        sp.write_text(SAMPLE_SP)
         stub = StubSharedParamFile(str(sp))
         assert stub.Groups[0].Definitions[0].DataType == "MASS"
 
@@ -173,9 +187,6 @@ class TestLoadDefinitionPathRestoration:
         assert defn.Name == "TEST_weight"
 
     def test_stub_app_filename_unchanged_after_call(self, tmp_path):
-        # In stub mode (CPython), load_definition never touches the filename.
-        # In Revit mode it would restore it — this test documents that the
-        # contract is "filename is the same before and after the call".
         sp = tmp_path / "params.txt"
         sp.write_text(SAMPLE_SP)
         app = StubApp(shared_params_filename="original_path")
@@ -226,3 +237,125 @@ class TestLoadDefinition:
         sp.write_text(MULTI_GROUP_SP)
         with pytest.raises(ValueError, match="Parameter 'ParamB'"):
             load_definition(None, str(sp), "GroupA", "ParamB")
+
+
+class TestFindDefinition:
+    def test_finds_param_in_first_group(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(MULTI_GROUP_SP)
+        defn = find_definition(None, str(sp), "ParamA")
+        assert defn.Name == "ParamA"
+
+    def test_finds_param_in_non_first_group(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(MULTI_GROUP_SP)
+        defn = find_definition(None, str(sp), "ParamB")
+        assert defn.Name == "ParamB"
+
+    def test_finds_param_in_single_group_file(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(SAMPLE_SP)
+        defn = find_definition(None, str(sp), "TEST_weight")
+        assert defn.Name == "TEST_weight"
+
+    def test_raises_on_missing_param(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(SAMPLE_SP)
+        with pytest.raises(ValueError, match="MISSING"):
+            find_definition(None, str(sp), "MISSING")
+
+    def test_raises_on_missing_file(self, tmp_path):
+        with pytest.raises(ValueError, match="not found"):
+            find_definition(None, str(tmp_path / "nonexistent.txt"), "AnyParam")
+
+    def test_stub_app_accepted(self, tmp_path):
+        sp = tmp_path / "params.txt"
+        sp.write_text(SAMPLE_SP)
+        app = StubApp(shared_params_filename="original_path")
+        defn = find_definition(app, str(sp), "TEST_weight")
+        assert defn.Name == "TEST_weight"
+
+
+class TestParseParamCsv:
+    SAMPLE_CSV = (
+        "Name,DataType,Instance,Group\n"
+        "CP_Weight,Mass,Yes,Construction\n"
+        "CP_Length,Length,No,Constraints\n"
+        "CP_Size,Text,No,Constraints\n"
+    )
+
+    def test_parses_correct_number_of_entries(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(self.SAMPLE_CSV)
+        entries = parse_param_csv(str(csv))
+        assert len(entries) == 3
+
+    def test_parses_name(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(self.SAMPLE_CSV)
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['name'] == "CP_Weight"
+
+    def test_parses_data_type(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(self.SAMPLE_CSV)
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['data_type'] == "Mass"
+
+    def test_yes_instance_is_true(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(self.SAMPLE_CSV)
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['is_instance'] is True
+
+    def test_no_instance_is_false(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(self.SAMPLE_CSV)
+        entries = parse_param_csv(str(csv))
+        assert entries[1]['is_instance'] is False
+
+    def test_parses_group(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(self.SAMPLE_CSV)
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['group'] == "Construction"
+        assert entries[1]['group'] == "Constraints"
+
+    def test_yes_case_insensitive(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text("Name,DataType,Instance,Group\nCP_X,Mass,YES,Construction\n")
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['is_instance'] is True
+
+    def test_yes_lowercase(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text("Name,DataType,Instance,Group\nCP_X,Mass,yes,Construction\n")
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['is_instance'] is True
+
+    def test_skips_blank_lines(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(
+            "Name,DataType,Instance,Group\n"
+            "CP_Weight,Mass,Yes,Construction\n"
+            "\n"
+            "CP_Length,Length,No,Constraints\n"
+        )
+        entries = parse_param_csv(str(csv))
+        assert len(entries) == 2
+
+    def test_raises_on_missing_file(self, tmp_path):
+        with pytest.raises(ValueError, match="not found"):
+            parse_param_csv(str(tmp_path / "nonexistent.csv"))
+
+    def test_raises_on_missing_column(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text("Name,DataType\nCP_Weight,Mass\n")
+        with pytest.raises(ValueError, match="missing required columns"):
+            parse_param_csv(str(csv))
+
+    def test_returns_empty_list_for_header_only(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text("Name,DataType,Instance,Group\n")
+        entries = parse_param_csv(str(csv))
+        assert entries == []

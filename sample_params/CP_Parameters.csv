@@ -1,0 +1,17 @@
+Name,DataType,Instance,Group
+CP_Weight,Mass,Yes,Construction
+CP_Weight_Per_Foot,Mass per Unit Length,Yes,Construction
+CP_Length,Length,No,Constraints
+CP_Size,Text,No,Constraints
+CP_Description,Text,No,Identity Data
+CP_Model_Number,Text,No,Identity Data
+CP_Manufacturer,Text,No,Identity Data
+CP_Material,Text,No,Identity Data
+CP_Finish,Text,No,Identity Data
+CP_Volume,Volume,No,Construction
+CP_Thickness,Length,No,Constraints
+CP_Diameter,Length,No,Constraints
+CP_Width,Length,No,Constraints
+CP_Angle,Angle,No,Constraints
+CP_Additional_Information,Text,No,Identity Data
+CP_Product_Code,Text,No,Identity Data

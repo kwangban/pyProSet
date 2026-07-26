@@ -26,6 +26,7 @@ IronPython 2.7 compatible.  No imports from pyrevit or Autodesk.Revit.DB
 at module level.
 """
 
+import csv
 import os
 
 try:
@@ -103,10 +104,8 @@ class StubSharedParamFile(object):
         ]
 
 
-# Names of the output parameters that this tool adds. Excluded from weight
-# candidate detection to prevent circular formulas when the button is re-run
-# on a family that already has these parameters.
-OUTPUT_PARAM_NAMES = ("CP_ERP_Weight", "CP_BOM_Weight")
+# REQUIRED_CSV_COLUMNS lists the column headers the parameter CSV must contain.
+REQUIRED_CSV_COLUMNS = ("Name", "DataType", "Instance", "Group")
 
 # DATATYPE values (column 4 of the PARAM line in a shared param .txt file)
 # that indicate lbf units. Revit treats Force and Weight (Structural discipline)
@@ -121,6 +120,45 @@ PER_UNIT_PATTERNS = (
 )
 
 
+def parse_param_csv(csv_path):
+    """Parse a shared-parameter CSV and return a list of entry dicts.
+
+    Each dict has keys:
+        name        (str)  -- shared parameter name
+        data_type   (str)  -- e.g. 'Mass', 'Length', 'Text'
+        is_instance (bool) -- True if 'Instance' column is 'yes' (case-insensitive)
+        group       (str)  -- family editor group name (e.g. 'Construction')
+
+    Raises ValueError if the file is not found or required columns are missing.
+    Skips blank lines.  Header row is auto-detected.
+    """
+    if not os.path.isfile(csv_path):
+        raise ValueError("CSV file not found: {}".format(csv_path))
+
+    entries = []
+    with open(csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        # Validate required columns
+        if reader.fieldnames is None:
+            raise ValueError("CSV file is empty: {}".format(csv_path))
+        missing = [c for c in REQUIRED_CSV_COLUMNS if c not in reader.fieldnames]
+        if missing:
+            raise ValueError(
+                "CSV missing required columns: {}".format(", ".join(missing))
+            )
+        for row in reader:
+            name = (row.get("Name") or "").strip()
+            if not name:
+                continue  # skip blank rows
+            entries.append({
+                "name":        name,
+                "data_type":   (row.get("DataType") or "").strip(),
+                "is_instance": (row.get("Instance") or "").strip().lower() == "yes",
+                "group":       (row.get("Group") or "").strip(),
+            })
+    return entries
+
+
 def is_force_like_datatype(data_type):
     """Return True if *data_type* (from a shared param .txt file) indicates lbf.
 
@@ -131,14 +169,14 @@ def is_force_like_datatype(data_type):
     return data_type.upper() in FORCE_LIKE_DATATYPES
 
 
-def is_output_param(name):
-    """Return True if *name* is one of the output parameters added by this tool.
+def is_output_param(name, output_names):
+    """Return True if *name* is one of the output parameters for this run.
 
-    CP_ERP_Weight and CP_BOM_Weight are excluded from weight candidate
-    detection to prevent circular formulas when the button is re-run on
-    a family that already has these parameters.
+    output_names should be the frozenset of CP_* parameter names loaded from
+    the CSV.  Passing an explicit set (rather than a module-level constant)
+    keeps the exclusion list in sync with whatever CSV the user chose.
     """
-    return name in OUTPUT_PARAM_NAMES
+    return name in output_names
 
 
 def is_per_unit(name):
@@ -224,3 +262,43 @@ def load_definition(app, sp_file_path, group_name, param_name):
         )
 
     return defn
+
+
+def find_definition(app, sp_file_path, param_name):
+    """Search ALL groups in the shared param file and return the ExternalDefinition.
+
+    Unlike load_definition(), no group name is required — every group is searched.
+    Raises ValueError if the parameter is not found in any group.
+
+    SharedParametersFilename contract: same as load_definition() — the path is
+    temporarily set then always restored.  Callers must re-set it immediately
+    before FamilyManager.AddParameter().
+    """
+    if _REVIT_AVAILABLE and app is not None:
+        old_path = app.SharedParametersFilename
+        try:
+            app.SharedParametersFilename = sp_file_path
+            sp_file = app.OpenSharedParameterFile()
+        finally:
+            app.SharedParametersFilename = old_path or ""
+        if sp_file is None:
+            raise ValueError(
+                "Could not open shared parameter file: {}".format(sp_file_path)
+            )
+    else:
+        if not os.path.isfile(sp_file_path):
+            raise ValueError(
+                "Shared parameter file not found: {}".format(sp_file_path)
+            )
+        sp_file = StubSharedParamFile(sp_file_path)
+
+    for group in sp_file.Groups:
+        defn = next((d for d in group.Definitions if d.Name == param_name), None)
+        if defn is not None:
+            return defn
+
+    raise ValueError(
+        "Parameter '{}' not found in any group in shared parameter file".format(
+            param_name
+        )
+    )
