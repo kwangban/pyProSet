@@ -206,18 +206,23 @@ if not families:
 # Unit-type helpers (depend on DB; cannot live in lib/).
 # ---------------------------------------------------------------------------
 def _is_force(fp):
-    """True if fp reports in lbf (Force or Structural Weight type)."""
-    if REVIT_VERSION >= 2022:
+    """True if fp reports in lbf (Force or Structural Weight type).
+
+    Tries GetSpecTypeId() first (Revit 2022+ ForgeTypeId API); falls back to
+    ParameterType (pre-2022) if the method is absent on InternalDefinition.
+    """
+    try:
         spec = fp.Definition.GetSpecTypeId()
         if spec == DB.SpecTypeId.Force:
             return True
         w = getattr(DB.SpecTypeId, 'Weight', None)
         return w is not None and spec == w
-    pt = fp.Definition.ParameterType
-    if pt == DB.ParameterType.Force:
-        return True
-    w = getattr(DB.ParameterType, 'Weight', None)
-    return w is not None and pt == w
+    except AttributeError:
+        pt = fp.Definition.ParameterType
+        if pt == DB.ParameterType.Force:
+            return True
+        w = getattr(DB.ParameterType, 'Weight', None)
+        return w is not None and pt == w
 
 
 TEXT_DATATYPES = frozenset(('text',))
