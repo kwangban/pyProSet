@@ -21,6 +21,11 @@ Import any set of CP shared parameters into an open family from a single shared
 parameter file. The parameter list is defined in a user-editable CSV — no Python
 changes needed when the list grows or changes.
 
+### Button: `add_stratus_params` (family editor)
+
+> Use this when you have a single `.rfa` open in the family editor and want to
+> apply CP parameters to it. For bulk project-wide stamping, see `stamp_view_families`.
+
 **Button: `add_stratus_params`**
 
 1. Prompts the user to select:
@@ -78,6 +83,20 @@ API types (`SpecTypeId.Force` vs `SpecTypeId.Weight`) but both report in lbf.
 Parameters are added in T1, formulas set in T2. If T2 fails (e.g. unit-type mismatch),
 T2 rolls back but T1 results are kept. The report lists formulas that need manual entry.
 
+### Button: `stamp_view_families` (project)
+
+> Use this when you have a Revit project (`.rvt`) open and want to stamp CP
+> parameters onto every loadable family visible in the active view in one click.
+
+1. Prompts for the shared parameter `.txt` file and the CSV (same files as above).
+2. Collects every unique loadable family whose instances appear in the active view.
+   Skips in-place families and non-editable (system) families.
+3. For each family: opens it with `EditFamily`, adds any missing CP parameters,
+   sets keyword-matched formulas, then reloads the family back into the project.
+4. Multi-match formula candidates (batch mode): takes the first alphabetically and
+   notes ambiguity in the report — no interactive picker to avoid repeated dialogs.
+5. Shows a per-family summary: added, already complete, failed, manual-entry needed.
+
 - `lib/shared_param_utils.py`: stub-aware parser for Revit shared param `.txt` files,
   `parse_param_csv()`, `find_definition()`, `make_formula()` — all testable without Revit
 - `tests/`: pytest suite (56 tests) covering parser, CSV reader, and formula logic
@@ -85,6 +104,7 @@ T2 rolls back but T1 results are kept. The report lists formulas that need manua
 **Definition of done:** Phase 1 is complete when:
 - All `tests/` pass in a plain Python environment (`pytest tests/ -v`)
 - The `add_stratus_params` button correctly imports and links parameters in an open `.rfa`
+- The `stamp_view_families` button correctly stamps all loadable families in the active view
 - A push to this repo is reflected in Revit after a pyRevit reload
 
 ---
@@ -116,8 +136,11 @@ Bulk operations that set up a full Revit project from a configuration template.
 pyProSet/
 ├── pyProSet.tab/                    pyRevit extension — tabs at repo root for direct clone
 │   ├── add_shared_params_test.panel/
-│   │   └── add_stratus_params.pushbutton/
-│   │       ├── script.py            CSV-driven parameter import; adds params and sets formulas
+│   │   ├── add_stratus_params.pushbutton/
+│   │   │   ├── script.py            Family-editor: CSV-driven import into a single open .rfa
+│   │   │   └── icon.png
+│   │   └── stamp_view_families.pushbutton/
+│   │       ├── script.py            Project: bulk-stamp all families visible in the active view
 │   │       └── icon.png
 │   └── key_plan.panel/
 │       └── Types.pushbutton/

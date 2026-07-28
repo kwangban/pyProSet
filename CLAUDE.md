@@ -108,6 +108,33 @@ fp = doc.FamilyManager.AddParameter(defn, group, is_instance)
 
 Forgetting this step produces the misleading error "Shared parameter creation failed."
 
+## stamp_view_families — project-level bulk stamper
+
+`stamp_view_families` works in a Revit **project** doc (guard: `doc.IsFamilyDocument`
+must be False — the inverse of `add_stratus_params`). It uses:
+
+- `FilteredElementCollector(doc, view.Id).OfClass(FamilyInstance)` to collect all
+  loadable family instances in the active view, deduplicated to unique `Family` objects.
+- `Family.IsInPlace` and `Family.IsEditable` to skip in-place and system families.
+- `doc.EditFamily(family)` → returns a `Document` (the family in edit mode).
+- The same T1 + T2 transaction pattern and `SharedParametersFilename` re-set as
+  `add_stratus_params`, but each transaction opens on `family_doc`, not `doc`.
+- `family_doc.LoadFamily(doc, _FamilyLoadOptions())` to reload the modified family.
+  `_FamilyLoadOptions` implements `IFamilyLoadOptions`; `out` params in IronPython
+  are exposed as `.Value` attributes on clr.Reference objects:
+  ```python
+  class _FamilyLoadOptions(DB.IFamilyLoadOptions):
+      def OnFamilyFound(self, familyInUse, overwriteParameterValues):
+          overwriteParameterValues.Value = True
+          return True
+      def OnSharedFamilyFound(self, sharedFamily, familyInUse, source, overwriteParameterValues):
+          source.Value = DB.FamilySource.Family
+          overwriteParameterValues.Value = True
+          return True
+  ```
+- No interactive multi-match picker in batch mode: first-alpha candidate wins;
+  ambiguity is noted in the final report.
+
 ## Formula type mismatch
 Revit's formula engine enforces dimensional consistency. If the source parameter is
 dimensionless (`NUMBER`) and the target is `MASS` in the shared param file, Revit

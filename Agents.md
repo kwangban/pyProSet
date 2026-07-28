@@ -12,8 +12,10 @@
 pyProSet/
 ├── pyProSet.tab/                  pyRevit extension — tab at repo root for direct clone
 │   └── add_shared_params_test.panel/
-│       └── add_stratus_params.pushbutton/
-│           └── script.py          Thin glue: prompts, calls lib/, calls Revit API
+│       ├── add_stratus_params.pushbutton/
+│       │   └── script.py          Family editor: CSV-driven import into a single open .rfa
+│       └── stamp_view_families.pushbutton/
+│           └── script.py          Project: bulk-stamps all loadable families in the active view
 ├── lib/
 │   └── shared_param_utils.py      Stub-aware shared param parser, CSV reader, make_formula()
 ├── tests/
@@ -135,6 +137,20 @@ fp = doc.FamilyManager.AddParameter(defn, revit_group, is_instance)
 
 Omitting this re-set produces the misleading Revit error "Shared parameter creation failed."
 
+## Button Context: Family Editor vs Project
+
+| Button | Context | Guard |
+|---|---|---|
+| `add_stratus_params` | Family editor (single `.rfa`) | `doc.IsFamilyDocument` must be **True** |
+| `stamp_view_families` | Project (`.rvt`) | `doc.IsFamilyDocument` must be **False** |
+
+`stamp_view_families` uses `EditFamily` / `LoadFamily` to open each family doc, apply the
+same CSV parameter + formula logic, and reload. Key differences from `add_stratus_params`:
+- `FilteredElementCollector(doc, view.Id).OfClass(FamilyInstance)` collects families.
+- Transactions open on `family_doc`, not the project `doc`.
+- `_FamilyLoadOptions` implements `IFamilyLoadOptions`; `out` params use `.Value`.
+- No interactive picker on multi-match — first alphabetically wins; noted in report.
+
 ## Typical Tasks for Agents
 - **Add a new pushbutton**: create a `<name>.pushbutton/` folder under the appropriate
   panel, add `script.py` (thin glue only — business logic goes in `lib/`)
@@ -142,7 +158,7 @@ Omitting this re-set produces the misleading Revit error "Shared parameter creat
   then add pytest tests before committing
 - **Change the parameter list**: edit `sample_params/CP_Parameters.csv` — no Python
   changes needed
-- **Add a new group**: extend `_GROUP_MAP` in `script.py` with the new group name
+- **Add a new group**: extend `_GROUP_MAP` in both `script.py` files with the new group name
 
 ## Open Questions / Backlog
 - Phase 2: Key Plan Tools (`Types` button)
