@@ -208,21 +208,32 @@ if not families:
 def _is_force(fp):
     """True if fp reports in lbf (Force or Structural Weight type).
 
-    Tries GetSpecTypeId() first (Revit 2022+ ForgeTypeId API); falls back to
-    ParameterType (pre-2022) if the method is absent on InternalDefinition.
+    Tries three paths in order, catching AttributeError at each:
+      1. fp.GetSpecTypeId()           -- direct on FamilyParameter (some 2022+ builds)
+      2. fp.Definition.GetSpecTypeId()-- via Definition (Revit 2022+)
+      3. fp.Definition.ParameterType  -- pre-2022 fallback
+    Returns False if none are available (graceful degradation; no /32.174 applied).
     """
+    for spec_getter in (
+        lambda: fp.GetSpecTypeId(),
+        lambda: fp.Definition.GetSpecTypeId(),
+    ):
+        try:
+            spec = spec_getter()
+            if spec == DB.SpecTypeId.Force:
+                return True
+            w = getattr(DB.SpecTypeId, 'Weight', None)
+            return w is not None and spec == w
+        except AttributeError:
+            continue
     try:
-        spec = fp.Definition.GetSpecTypeId()
-        if spec == DB.SpecTypeId.Force:
-            return True
-        w = getattr(DB.SpecTypeId, 'Weight', None)
-        return w is not None and spec == w
-    except AttributeError:
         pt = fp.Definition.ParameterType
         if pt == DB.ParameterType.Force:
             return True
         w = getattr(DB.ParameterType, 'Weight', None)
         return w is not None and pt == w
+    except AttributeError:
+        return False
 
 
 TEXT_DATATYPES = frozenset(('text',))
