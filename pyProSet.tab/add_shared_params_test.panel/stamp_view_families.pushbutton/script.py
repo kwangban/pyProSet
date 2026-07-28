@@ -47,6 +47,11 @@ from shared_param_utils import (  # noqa: F401 -- lib/
 # CONFIGURE
 # ---------------------------------------------------------------------------
 GRAVITY_CONV = 32.174   # lbf -> lbm divisor
+# When the Revit API cannot determine a source parameter's unit type, this flag
+# controls whether mass-target parameters receive the / 32.174 conversion.
+# True  = assume source is lbf (correct for most structural weight parameters).
+# False = assume source is already lbm (direct reference, no conversion).
+ASSUME_WEIGHT_SOURCE_IS_LBF = True
 # ---------------------------------------------------------------------------
 
 app = __revit__.Application                # noqa: F821
@@ -233,10 +238,11 @@ def _is_force(fp):
         w = getattr(DB.ParameterType, 'Weight', None)
         return w is not None and pt == w
     except AttributeError:
-        return False
+        return ASSUME_WEIGHT_SOURCE_IS_LBF
 
 
 TEXT_DATATYPES = frozenset(('text',))
+_MASS_DATATYPES = frozenset(('mass', 'mass per unit length'))
 
 # ---------------------------------------------------------------------------
 # Per-family loop.
@@ -342,7 +348,7 @@ for family in families.values():
             ambiguous.append(param_name)
 
         source_is_force = (
-            p['data_type'].strip().lower() == 'mass'
+            p['data_type'].strip().lower() in _MASS_DATATYPES
             and _is_force(source_fp)
         )
         formula_assignments[param_name] = make_formula(
