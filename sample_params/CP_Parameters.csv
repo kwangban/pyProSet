@@ -13,5 +13,5 @@ CP_Size,Text,Yes,Constraints
 CP_Thickness,Length,Yes,Constraints
 CP_Volume,Volume,Yes,Construction
 CP_Weight,Mass,Yes,Construction
-CP_Weight_Per_Foot,Mass per Unit Length,Yes,Construction
+CP_Weight_Per_Foot,Mass per Unit Length,Yes,Set
 CP_Width,Length,Yes,Construction
