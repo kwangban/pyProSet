@@ -235,8 +235,11 @@ else:
 # ---------------------------------------------------------------------------
 all_family_params = list(doc.FamilyManager.GetParameters())  # re-fetch after T1
 
-TEXT_DATATYPES = frozenset(('text',))
+TEXT_DATATYPES  = frozenset(('text',))
 _MASS_DATATYPES = frozenset(('mass', 'mass per unit length'))
+# Fallback synonyms for mass-target params when keyword doesn't match
+# (e.g. "weight per foot" won't find "Pounds Per Foot").
+_WEIGHT_SYNONYMS = ('weight', 'pound', 'lbf', 'kip', 'plf')
 
 formula_assignments = {}   # added CP_* name -> formula string
 formula_not_found   = []   # CP_* names where no matching source was found
@@ -256,6 +259,16 @@ for p in to_add:
         and not is_output_param(fp.Definition.Name, output_names)
         and is_per_unit(fp.Definition.Name) == want_per_unit
     ]
+
+    # Keyword like "weight per foot" won't match "Pounds Per Foot".
+    # For mass-typed targets with no primary hit, retry with weight synonyms.
+    if not candidates and p['data_type'].strip().lower() in _MASS_DATATYPES:
+        candidates = [
+            fp for fp in all_family_params
+            if any(syn in fp.Definition.Name.lower() for syn in _WEIGHT_SYNONYMS)
+            and not is_output_param(fp.Definition.Name, output_names)
+            and is_per_unit(fp.Definition.Name) == want_per_unit
+        ]
 
     if not candidates:
         formula_not_found.append(param_name)
