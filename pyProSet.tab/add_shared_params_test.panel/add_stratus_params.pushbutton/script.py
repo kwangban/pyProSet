@@ -317,7 +317,14 @@ if formula_assignments:
 # ---------------------------------------------------------------------------
 # Save and report.
 # ---------------------------------------------------------------------------
-doc.Save()
+save_warning = None
+if doc.PathName:
+    try:
+        doc.Save()
+    except Exception as ex:
+        save_warning = "Auto-save failed: {}".format(str(ex))
+else:
+    save_warning = "Family has no file path — use File > Save As to save changes."
 
 lines = []
 
@@ -349,5 +356,8 @@ if needs_manual:
         lines.append("\nFormula errors:")
         for name, err in formula_failures.items():
             lines.append("  {} : {}".format(name, err))
+
+if save_warning:
+    lines.append("\nNote: {}".format(save_warning))
 
 forms.alert("\n".join(lines), title="Stratus Parameters - Done")
