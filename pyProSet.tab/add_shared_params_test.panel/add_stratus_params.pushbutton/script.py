@@ -46,6 +46,11 @@ from shared_param_utils import (  # noqa: F401 -- lib/
 # CONFIGURE
 # ---------------------------------------------------------------------------
 GRAVITY_CONV = 32.174   # lbf -> lbm divisor
+# When the Revit API cannot determine a source parameter's unit type, this flag
+# controls whether mass-target parameters receive the / 32.174 conversion.
+# True  = assume source is lbf (correct for most structural weight parameters).
+# False = assume source is already lbm (direct reference, no conversion).
+ASSUME_WEIGHT_SOURCE_IS_LBF = True
 # ---------------------------------------------------------------------------
 
 app = __revit__.Application                # noqa: F821
@@ -150,18 +155,34 @@ if missing_defs:
 # Helpers for unit-type detection and formula source lookup.
 # ---------------------------------------------------------------------------
 def _is_force(fp):
-    """True if fp reports in lbf (Force or Structural Weight type)."""
-    if REVIT_VERSION >= 2022:
-        spec = fp.Definition.GetSpecTypeId()
-        if spec == DB.SpecTypeId.Force:
+    """True if fp reports in lbf (Force or Structural Weight type).
+
+    Tries three paths in order, catching AttributeError at each:
+      1. fp.GetSpecTypeId()            -- direct on FamilyParameter (some 2022+ builds)
+      2. fp.Definition.GetSpecTypeId() -- via Definition (Revit 2022+)
+      3. fp.Definition.ParameterType   -- pre-2022 fallback
+    Falls back to ASSUME_WEIGHT_SOURCE_IS_LBF when all paths fail.
+    """
+    for spec_getter in (
+        lambda: fp.GetSpecTypeId(),
+        lambda: fp.Definition.GetSpecTypeId(),
+    ):
+        try:
+            spec = spec_getter()
+            if spec == DB.SpecTypeId.Force:
+                return True
+            w = getattr(DB.SpecTypeId, 'Weight', None)
+            return w is not None and spec == w
+        except AttributeError:
+            continue
+    try:
+        pt = fp.Definition.ParameterType
+        if pt == DB.ParameterType.Force:
             return True
-        w = getattr(DB.SpecTypeId, 'Weight', None)
-        return w is not None and spec == w
-    pt = fp.Definition.ParameterType
-    if pt == DB.ParameterType.Force:
-        return True
-    w = getattr(DB.ParameterType, 'Weight', None)
-    return w is not None and pt == w
+        w = getattr(DB.ParameterType, 'Weight', None)
+        return w is not None and pt == w
+    except AttributeError:
+        return ASSUME_WEIGHT_SOURCE_IS_LBF
 
 
 def _get_family_param(name):
@@ -215,6 +236,7 @@ else:
 all_family_params = list(doc.FamilyManager.GetParameters())  # re-fetch after T1
 
 TEXT_DATATYPES = frozenset(('text',))
+_MASS_DATATYPES = frozenset(('mass', 'mass per unit length'))
 
 formula_assignments = {}   # added CP_* name -> formula string
 formula_not_found   = []   # CP_* names where no matching source was found
@@ -254,9 +276,9 @@ for p in to_add:
             continue
         source_fp = next(fp for fp in candidates if fp.Definition.Name == chosen)
 
-    # Apply /32.174 only when target is Mass and source reports in lbf.
+    # Apply /32.174 only when target is a mass type and source reports in lbf.
     source_is_force = (
-        p['data_type'].strip().lower() == 'mass'
+        p['data_type'].strip().lower() in _MASS_DATATYPES
         and _is_force(source_fp)
     )
     formula_assignments[param_name] = make_formula(
