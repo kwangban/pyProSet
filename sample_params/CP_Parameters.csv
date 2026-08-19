@@ -1,6 +1,7 @@
 Name,DataType,Instance,Group
 CP_Additional_Information,Text,Yes,Identity Data
 CP_Angle,Angle,Yes,Constraints
+CP_BOM_Weight,Mass,Yes,Construction
 CP_Description,Text,Yes,Identity Data
 CP_Diameter,Length,Yes,Constraints
 CP_Finish,Text,Yes,Construction
