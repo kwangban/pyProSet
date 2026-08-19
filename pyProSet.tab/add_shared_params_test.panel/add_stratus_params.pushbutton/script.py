@@ -37,7 +37,6 @@ from pyrevit import DB, forms, script
 from shared_param_utils import (  # noqa: F401 -- lib/
     parse_param_csv,
     find_definition,
-    is_output_param,
     is_per_unit,
     make_formula,
 )
@@ -256,7 +255,7 @@ for p in to_add:
     candidates = [
         fp for fp in all_family_params
         if keyword in fp.Definition.Name.lower()
-        and not is_output_param(fp.Definition.Name, output_names)
+        and fp.Definition.Name != param_name
         and is_per_unit(fp.Definition.Name) == want_per_unit
     ]
 
@@ -266,7 +265,7 @@ for p in to_add:
         candidates = [
             fp for fp in all_family_params
             if any(syn in fp.Definition.Name.lower() for syn in _WEIGHT_SYNONYMS)
-            and not is_output_param(fp.Definition.Name, output_names)
+            and fp.Definition.Name != param_name
             and is_per_unit(fp.Definition.Name) == want_per_unit
         ]
 
