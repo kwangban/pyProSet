@@ -2,8 +2,8 @@
 
 ## Project Snapshot
 - **Goal**: provide a `pyProSet` tab in the Revit ribbon with one-click tools for
-  project setup workflows — shared parameter management, key plan configuration, and
-  family data standardization.
+  project setup workflows — shared parameter management, key plan configuration,
+  family data standardization, and drafting utilities.
 - **Why it matters**: runs inside Revit via IronPython; logic in `lib/` is testable
   in plain Python without Revit.
 
@@ -11,17 +11,22 @@
 ```
 pyProSet/
 ├── pyProSet.tab/                  pyRevit extension — tab at repo root for direct clone
-│   └── add_shared_params_test.panel/
-│       ├── add_stratus_params.pushbutton/
-│       │   └── script.py          Family editor: CSV-driven import into a single open .rfa
-│       └── stamp_view_families.pushbutton/
-│           └── script.py          Project: bulk-stamps all loadable families in the active view
+│   ├── add_shared_params_test.panel/
+│   │   ├── add_stratus_params.pushbutton/
+│   │   │   └── script.py          Family editor: CSV-driven import into a single open .rfa
+│   │   └── stamp_view_families.pushbutton/
+│   │       └── script.py          Project: bulk-stamps all loadable families in the active view
+│   └── dim_tools.panel/
+│       └── quick_dims_spacing.pushbutton/
+│           └── script.py          Project: evenly space selected dims; shift text L/R
 ├── lib/
 │   └── shared_param_utils.py      Stub-aware shared param parser, CSV reader, make_formula()
 ├── tests/
 │   └── test_shared_param_utils.py 56-test pytest suite — runs in CPython, no Revit needed
 ├── sample_params/
-│   └── CP_Parameters.csv          Starter CSV with 16 default CP_* parameters
+│   └── CP_Parameters.csv          Starter CSV with 17 default CP_* parameters
+├── docs/
+│   └── QuickDimsSpacing_design.md Design doc for the quick_dims_spacing button
 ├── CLAUDE.md                      Rules for Claude Code agents
 ├── Agents.md                      This file
 └── README.md
@@ -143,6 +148,7 @@ Omitting this re-set produces the misleading Revit error "Shared parameter creat
 |---|---|---|
 | `add_stratus_params` | Family editor (single `.rfa`) | `doc.IsFamilyDocument` must be **True** |
 | `stamp_view_families` | Project (`.rvt`) | `doc.IsFamilyDocument` must be **False** |
+| `quick_dims_spacing` | Project view | `doc.IsFamilyDocument` must be **False** |
 
 `stamp_view_families` uses `EditFamily` / `LoadFamily` to open each family doc, apply the
 same CSV parameter + formula logic, and reload. Key differences from `add_stratus_params`:
@@ -159,6 +165,30 @@ same CSV parameter + formula logic, and reload. Key differences from `add_stratu
 - **Change the parameter list**: edit `sample_params/CP_Parameters.csv` — no Python
   changes needed
 - **Add a new group**: extend `_GROUP_MAP` in both `script.py` files with the new group name
+
+## Dimension Spacing Pattern (`quick_dims_spacing`)
+
+All logic is Revit-API-specific and lives entirely in `script.py` — no `lib/` helpers
+and no tests (cannot run without Revit). Key formulas:
+
+```python
+# Stacking direction (perpendicular to dim, in view plane)
+stack_dir = dim.Curve.Direction.CrossProduct(view.ViewDirection).Normalize()
+
+# Scale-aware model spacing
+model_spacing = PAPER_SPACING_INCHES * view.Scale / 12   # feet
+
+# Sort by current stack offset
+offset = dim.Curve.Origin.DotProduct(stack_dir)
+
+# Move
+DB.ElementTransformUtils.MoveElement(doc, dim.Id, stack_dir.Multiply(delta))
+
+# Text shift
+dim.TextPosition = dim.TextPosition.Add(dim_dir.Multiply(±text_shift_model))
+```
+
+See `docs/QuickDimsSpacing_design.md` for full derivation and limitations.
 
 ## Open Questions / Backlog
 - Phase 2: Key Plan Tools (`Types` button)

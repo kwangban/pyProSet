@@ -135,6 +135,34 @@ must be False — the inverse of `add_stratus_params`). It uses:
 - No interactive multi-match picker in batch mode: first-alpha candidate wins;
   ambiguity is noted in the final report.
 
+## quick_dims_spacing — dimension spacing tool
+
+`quick_dims_spacing` works in a Revit **project** view (guard: `doc.IsFamilyDocument`
+must be False). It uses:
+
+- `uidoc.Selection.GetElementIds()` + `isinstance(elem, DB.Dimension)` to filter the
+  pre-selected elements down to Dimension objects.
+- **Stacking direction**: `dim.Curve.Direction.CrossProduct(view.ViewDirection).Normalize()`
+  gives the direction perpendicular to the dimension line in the view plane.
+- **Scale formula**: `model_spacing = PAPER_SPACING_INCHES × view.Scale / 12` converts
+  a fixed paper-space gap to model feet. `view.Scale` is an integer (e.g. 48 for 1/4"=1').
+- **Sorting**: each dim's current stack offset = `dim.Curve.Origin.DotProduct(stack_dir)`.
+  Dims are sorted by offset; the innermost stays fixed and the rest are moved to
+  `base_offset + i × model_spacing`.
+- **Moving**: `DB.ElementTransformUtils.MoveElement(doc, dim.Id, vector)`.
+- **Text shift**: `dim.TextPosition = dim.TextPosition.Add(shift_vector)` along
+  `dim.Curve.Direction`. Read-only on multi-segment dims — failures caught per element.
+- Single named transaction wraps all moves and text changes → one Ctrl+Z undoes all.
+
+CONFIGURE constants in this button:
+```python
+PAPER_SPACING_INCHES    = 0.375   # 3/8" between adjacent dim lines on paper
+TEXT_PAPER_SHIFT_INCHES = 0.125   # 1/8" text shift left or right on paper
+```
+
+No `lib/` utilities are used — all logic is Revit-API-specific and lives in `script.py`.
+See `docs/QuickDimsSpacing_design.md` for the full design rationale.
+
 ## Formula type mismatch
 Revit's formula engine enforces dimensional consistency. If the source parameter is
 dimensionless (`NUMBER`) and the target is `MASS` in the shared param file, Revit

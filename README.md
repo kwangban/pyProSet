@@ -130,6 +130,33 @@ Bulk operations that set up a full Revit project from a configuration template.
 
 ---
 
+### Phase 4 — Dimension Tools *(in progress)*
+
+Tools for drafting quality control and annotation efficiency.
+
+### Button: `quick_dims_spacing` (project view)
+
+> Select two or more parallel dimension lines, then click. The button spaces
+> them evenly at a constant paper-space gap and optionally shifts dimension
+> text left or right.
+
+1. Pre-select two or more `Dimension` elements in the active view.
+2. A dialog asks: **Move text? → None / Left / Right.**
+3. The button sorts the selected dims by their perpendicular offset from the
+   dimension line direction (the "stacking direction").
+4. Evenly spaces them using:
+   `model_gap = PAPER_SPACING_INCHES (3/8") × view.Scale / 12`
+   so the gap is always 3/8" on paper regardless of drawing scale.
+5. If a text direction is chosen, shifts each dim's `TextPosition` by
+   `TEXT_PAPER_SHIFT_INCHES (1/8") × view.Scale / 12` left or right along
+   the dimension line.
+6. All changes are wrapped in a single named transaction — one **Ctrl+Z** undoes everything.
+
+See [`docs/QuickDimsSpacing_design.md`](docs/QuickDimsSpacing_design.md) for
+full API details, the stacking-direction formula, and known limitations.
+
+---
+
 ## Repository Structure
 
 ```
@@ -137,21 +164,23 @@ pyProSet/
 ├── pyProSet.tab/                    pyRevit extension — tabs at repo root for direct clone
 │   ├── add_shared_params_test.panel/
 │   │   ├── add_stratus_params.pushbutton/
-│   │   │   ├── script.py            Family-editor: CSV-driven import into a single open .rfa
-│   │   │   └── icon.png
+│   │   │   └── script.py            Family-editor: CSV-driven import into a single open .rfa
 │   │   └── stamp_view_families.pushbutton/
-│   │       ├── script.py            Project: bulk-stamp all families visible in the active view
-│   │       └── icon.png
+│   │       └── script.py            Project: bulk-stamp all families visible in the active view
+│   ├── dim_tools.panel/
+│   │   └── quick_dims_spacing.pushbutton/
+│   │       └── script.py            Project: evenly space selected dims; shift text L/R
 │   └── key_plan.panel/
 │       └── Types.pushbutton/
-│           ├── script.py
-│           └── icon.png
+│           └── script.py
 ├── lib/
 │   └── shared_param_utils.py        Stub-aware parser + CSV reader + make_formula()
 ├── tests/
 │   └── test_shared_param_utils.py   56 tests; runs in CPython without Revit
 ├── sample_params/
-│   └── CP_Parameters.csv            Starter CSV with 16 CP_* parameters
+│   └── CP_Parameters.csv            Starter CSV with 17 CP_* parameters
+├── docs/
+│   └── QuickDimsSpacing_design.md   Design doc: API concepts, spacing math, limitations
 ├── CLAUDE.md                        Rules for Claude Code agents working in this repo
 └── README.md
 ```
