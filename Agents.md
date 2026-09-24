@@ -184,8 +184,14 @@ offset = dim.Curve.Origin.DotProduct(stack_dir)
 # Move
 DB.ElementTransformUtils.MoveElement(doc, dim.Id, stack_dir.Multiply(delta))
 
-# Text shift
-dim.TextPosition = dim.TextPosition.Add(dim_dir.Multiply(±text_shift_model))
+# Text placement — outside the dimension extent
+# (dim_dir is first canonicalized so it always points screen-right)
+if pt0.DotProduct(dim_dir) < pt1.DotProduct(dim_dir):
+    left_pt, right_pt = pt0, pt1
+else:
+    left_pt, right_pt = pt1, pt0
+dim.TextPosition = left_pt.Add(dim_dir.Multiply(-overhang))   # Left
+dim.TextPosition = right_pt.Add(dim_dir.Multiply(+overhang))  # Right
 ```
 
 See `docs/QuickDimsSpacing_design.md` for full derivation and limitations.

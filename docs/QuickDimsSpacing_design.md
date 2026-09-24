@@ -43,6 +43,14 @@ stacking direction in the view plane is computed with the cross product:
 stack_dir = dim_line_direction × view.ViewDirection
 ```
 
+`dim_line_direction` is first canonicalized against `view.RightDirection` so
+that it always points screen-right (Revit may store it in either direction):
+
+```python
+if dim_dir.DotProduct(view.RightDirection) < 0:
+    dim_dir = dim_dir.Negate()
+```
+
 `view.ViewDirection` is a unit vector pointing **into the screen** (away from
 the viewer). For a plan view looking down this is `(0, 0, -1)`.
 
@@ -76,12 +84,22 @@ Setting it moves the label along the dimension line. For multi-segment
 dimensions (string dims with multiple references) the property may be read-only
 on some Revit builds; failures are caught and reported.
 
-Text shift:
+Text is placed **outside the dimension extent** by reading the dimension line's
+endpoints after the move and setting `TextPosition` just beyond the chosen end:
+
 ```
-text_shift_model = TEXT_PAPER_SHIFT_INCHES × view.Scale / 12
-text_vec = dim_dir × (±text_shift_model)   # + = Right, - = Left
-new_pos  = dim.TextPosition + text_vec
+overhang = TEXT_OVERHANG_PAPER_INCHES × view.Scale / 12   # feet
+
+left_pt  = endpoint with smaller dim_dir dot product       # screen-left end
+right_pt = endpoint with larger  dim_dir dot product       # screen-right end
+
+"Left"  → TextPosition = left_pt  + dim_dir × (−overhang)
+"Right" → TextPosition = right_pt + dim_dir × (+overhang)
 ```
+
+`dim_dir` is canonicalized against `view.RightDirection` before use (see
+Stacking Direction) so that "Left" is always screen-left regardless of how
+Revit internally stored the dimension curve direction.
 
 ---
 
@@ -111,12 +129,13 @@ new_pos  = dim.TextPosition + text_vec
 ## CONFIGURE Constants
 
 ```python
-PAPER_SPACING_INCHES    = 0.375   # 3/8" on paper between adjacent dim lines
-TEXT_PAPER_SHIFT_INCHES = 0.125   # 1/8" on paper text shift left or right
+PAPER_SPACING_INCHES       = 0.375    # 3/8" on paper between adjacent dim lines
+TEXT_OVERHANG_PAPER_INCHES = 0.0625  # 1/16" gap from tick mark to text edge
 ```
 
 Adjust `PAPER_SPACING_INCHES` to match office standards (common values: 0.25",
-0.375", 0.5").
+0.375", 0.5"). Increase `TEXT_OVERHANG_PAPER_INCHES` if the text overlaps the
+extension line at the drawing scale in use.
 
 ---
 

@@ -147,9 +147,9 @@ Tools for drafting quality control and annotation efficiency.
 4. Evenly spaces them using:
    `model_gap = PAPER_SPACING_INCHES (3/8") × view.Scale / 12`
    so the gap is always 3/8" on paper regardless of drawing scale.
-5. If a text direction is chosen, shifts each dim's `TextPosition` by
-   `TEXT_PAPER_SHIFT_INCHES (1/8") × view.Scale / 12` left or right along
-   the dimension line.
+5. If a text direction is chosen, places each dim's text **outside** the
+   dimension extent: to the left of the left tick mark, or to the right of the
+   right tick mark, with a 1/16" paper-space gap (`TEXT_OVERHANG_PAPER_INCHES`).
 6. All changes are wrapped in a single named transaction — one **Ctrl+Z** undoes everything.
 
 See [`docs/QuickDimsSpacing_design.md`](docs/QuickDimsSpacing_design.md) for

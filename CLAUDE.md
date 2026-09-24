@@ -150,14 +150,20 @@ must be False). It uses:
   Dims are sorted by offset; the innermost stays fixed and the rest are moved to
   `base_offset + i × model_spacing`.
 - **Moving**: `DB.ElementTransformUtils.MoveElement(doc, dim.Id, vector)`.
-- **Text shift**: `dim.TextPosition = dim.TextPosition.Add(shift_vector)` along
-  `dim.Curve.Direction`. Read-only on multi-segment dims — failures caught per element.
-- Single named transaction wraps all moves and text changes → one Ctrl+Z undoes all.
+- **`dim_dir` canonicalization**: after `dims[0].Curve.Direction.Normalize()`, check
+  `dim_dir.DotProduct(view.RightDirection)` and negate if negative. This ensures "Left"
+  always means screen-left regardless of how Revit stored the dim's curve direction.
+- **Text placement**: after `MoveElement`, re-read `dim.Curve` to get updated endpoints.
+  Identify the left/right endpoint by dot product with `dim_dir`, then set
+  `dim.TextPosition = endpoint.Add(dim_dir.Multiply(±overhang))`. This places the text
+  outside the tick marks rather than nudging it from centre.
+  Read-only on multi-segment dims — failures caught per element.
+- Single named transaction wraps all moves and text placements → one Ctrl+Z undoes all.
 
 CONFIGURE constants in this button:
 ```python
-PAPER_SPACING_INCHES    = 0.375   # 3/8" between adjacent dim lines on paper
-TEXT_PAPER_SHIFT_INCHES = 0.125   # 1/8" text shift left or right on paper
+PAPER_SPACING_INCHES       = 0.375    # 3/8" between adjacent dim lines on paper
+TEXT_OVERHANG_PAPER_INCHES = 0.0625  # 1/16" gap from tick mark to text edge on paper
 ```
 
 No `lib/` utilities are used — all logic is Revit-API-specific and lives in `script.py`.

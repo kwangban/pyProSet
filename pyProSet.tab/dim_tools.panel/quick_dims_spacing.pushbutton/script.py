@@ -10,8 +10,8 @@ Workflow
    dimension line direction, then moves each one to an evenly spaced position.
 5. Spacing is derived from the view's print scale so the gap is constant on
    paper regardless of the drawing scale.
-6. If a text direction was chosen, each dimension's TextPosition is shifted
-   left or right along the dimension line by a fixed paper-space amount.
+6. If a text direction was chosen, each dimension's TextPosition is placed
+   just outside the left or right endpoint of the dimension line.
 
 Spacing math
 ------------
@@ -38,7 +38,7 @@ from pyrevit import DB, forms, script
 # CONFIGURE
 # ---------------------------------------------------------------------------
 PAPER_SPACING_INCHES    = 0.375   # gap between adjacent dim lines on paper (in)
-TEXT_PAPER_SHIFT_INCHES = 0.125   # text shift left/right on paper (in)
+TEXT_OVERHANG_PAPER_INCHES = 0.0625  # gap from tick mark to text edge on paper (in)
 # ---------------------------------------------------------------------------
 
 app   = __revit__.Application                # noqa: F821
@@ -86,9 +86,16 @@ if choice is None:
 # ---------------------------------------------------------------------------
 # Stacking direction: perpendicular to dim line, in the view plane.
 # ---------------------------------------------------------------------------
-view     = doc.ActiveView
-view_dir = view.ViewDirection                           # points into screen
-dim_dir  = dims[0].Curve.Direction.Normalize()
+view       = doc.ActiveView
+view_dir   = view.ViewDirection                         # points into screen
+view_right = view.RightDirection                        # points screen-right
+dim_dir    = dims[0].Curve.Direction.Normalize()
+
+# Canonicalize: ensure dim_dir always points screen-right so that
+# "Left" and "Right" are consistent regardless of how Revit stored
+# the dimension curve direction.
+if dim_dir.DotProduct(view_right) < 0:
+    dim_dir = dim_dir.Negate()
 
 # Warn if dims are not all parallel (tolerance: angle > 1 degree).
 _TOL = 0.01745   # sin(1 degree)
@@ -120,16 +127,9 @@ base_offset  = sorted_pairs[0][0]
 targets      = [base_offset + i * model_spacing for i in range(len(sorted_dims))]
 
 # ---------------------------------------------------------------------------
-# Text shift vector (along the dim line).
+# Text overhang distance (used inside the transaction loop).
 # ---------------------------------------------------------------------------
-text_shift_model = TEXT_PAPER_SHIFT_INCHES * view_scale / 12.0
-
-if choice == "Right":
-    text_vec = dim_dir.Multiply(text_shift_model)
-elif choice == "Left":
-    text_vec = dim_dir.Multiply(-text_shift_model)
-else:
-    text_vec = None
+text_overhang = TEXT_OVERHANG_PAPER_INCHES * view_scale / 12.0  # feet
 
 # ---------------------------------------------------------------------------
 # Transaction: move dims and reposition text.
@@ -145,9 +145,23 @@ try:
         move    = stack_dir.Multiply(delta)
         DB.ElementTransformUtils.MoveElement(doc, dim.Id, move)
 
-        if text_vec is not None:
+        if choice != "None":
             try:
-                dim.TextPosition = dim.TextPosition.Add(text_vec)
+                # Re-read the curve after the move so endpoints are current.
+                curve = dim.Curve
+                pt0   = curve.GetEndPoint(0)
+                pt1   = curve.GetEndPoint(1)
+                # Identify left/right endpoints relative to canonicalized dim_dir.
+                if pt0.DotProduct(dim_dir) < pt1.DotProduct(dim_dir):
+                    left_pt  = pt0
+                    right_pt = pt1
+                else:
+                    left_pt  = pt1
+                    right_pt = pt0
+                if choice == "Right":
+                    dim.TextPosition = right_pt.Add(dim_dir.Multiply(text_overhang))
+                else:
+                    dim.TextPosition = left_pt.Add(dim_dir.Multiply(-text_overhang))
             except Exception:
                 text_skip.append(dim.Id.IntegerValue)
     t.Commit()
