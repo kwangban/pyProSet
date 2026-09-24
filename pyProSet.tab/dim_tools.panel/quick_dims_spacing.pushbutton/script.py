@@ -139,15 +139,23 @@ text_skip = []
 t = DB.Transaction(doc, "QuickDimsSpacing")
 try:
     t.Start()
+
+    # Pass 1: move all dims.
     for i, dim in enumerate(sorted_dims):
         current = dim.Curve.Origin.DotProduct(stack_dir)
         delta   = targets[i] - current
         move    = stack_dir.Multiply(delta)
         DB.ElementTransformUtils.MoveElement(doc, dim.Id, move)
 
+    # Regenerate so that Curve endpoints reflect the new positions
+    # before we read them for text placement.
+    if choice != "None":
+        doc.Regenerate()
+
+    # Pass 2: set text positions using updated geometry.
+    for dim in sorted_dims:
         if choice != "None":
             try:
-                # Re-read the curve after the move so endpoints are current.
                 curve = dim.Curve
                 pt0   = curve.GetEndPoint(0)
                 pt1   = curve.GetEndPoint(1)
@@ -164,6 +172,7 @@ try:
                     dim.TextPosition = left_pt.Add(dim_dir.Multiply(-text_overhang))
             except Exception:
                 text_skip.append(dim.Id.IntegerValue)
+
     t.Commit()
 except Exception as ex:
     if t.HasStarted() and not t.HasEnded():
