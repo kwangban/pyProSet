@@ -134,7 +134,8 @@ text_overhang = TEXT_OVERHANG_PAPER_INCHES * view_scale / 12.0  # feet
 # ---------------------------------------------------------------------------
 # Transaction: move dims and reposition text.
 # ---------------------------------------------------------------------------
-text_skip = []
+text_skip      = []   # element ids that failed
+first_err_msg  = []   # capture one real error message for diagnostics
 
 t = DB.Transaction(doc, "QuickDimsSpacing")
 try:
@@ -147,30 +148,44 @@ try:
         move    = stack_dir.Multiply(delta)
         DB.ElementTransformUtils.MoveElement(doc, dim.Id, move)
 
-    # Regenerate so that Curve endpoints reflect the new positions
-    # before we read them for text placement.
+    # Regenerate so that Curve endpoints reflect the new positions.
     if choice != "None":
         doc.Regenerate()
 
     # Pass 2: set text positions using updated geometry.
     for dim in sorted_dims:
-        if choice != "None":
+        if choice == "None":
+            continue
+
+        n_segs = dim.NumberOfSegments  # 0 or 1 = single; >1 = multi-segment string dim
+        sign   = 1 if choice == "Right" else -1
+
+        if n_segs > 1:
+            # Multi-segment (string) dimension: set each segment individually.
+            for seg in dim.Segments:
+                try:
+                    seg.TextPosition = seg.TextPosition.Add(
+                        dim_dir.Multiply(sign * text_overhang)
+                    )
+                except Exception as tex:
+                    if not first_err_msg:
+                        first_err_msg.append("seg: " + str(tex))
+                    text_skip.append(dim.Id.IntegerValue)
+                    break
+        else:
+            # Single-segment dimension: place text outside the endpoint.
             try:
                 curve = dim.Curve
                 pt0   = curve.GetEndPoint(0)
                 pt1   = curve.GetEndPoint(1)
-                # Identify left/right endpoints relative to canonicalized dim_dir.
                 if pt0.DotProduct(dim_dir) < pt1.DotProduct(dim_dir):
-                    left_pt  = pt0
-                    right_pt = pt1
+                    anchor = pt0 if choice == "Left" else pt1
                 else:
-                    left_pt  = pt1
-                    right_pt = pt0
-                if choice == "Right":
-                    dim.TextPosition = right_pt.Add(dim_dir.Multiply(text_overhang))
-                else:
-                    dim.TextPosition = left_pt.Add(dim_dir.Multiply(-text_overhang))
-            except Exception:
+                    anchor = pt1 if choice == "Left" else pt0
+                dim.TextPosition = anchor.Add(dim_dir.Multiply(sign * text_overhang))
+            except Exception as tex:
+                if not first_err_msg:
+                    first_err_msg.append("single: " + str(tex))
                 text_skip.append(dim.Id.IntegerValue)
 
     t.Commit()
@@ -192,9 +207,11 @@ lines = [
     "Text direction: {}.".format(choice),
 ]
 if text_skip:
-    lines.append(
-        "\nText position could not be set on {} dimension(s) "
-        "(multi-segment or locked) — adjust manually.".format(len(text_skip))
+    msg = "\nText position could not be set on {} dimension(s).".format(
+        len(set(text_skip))
     )
+    if first_err_msg:
+        msg += "\nError: {}".format(first_err_msg[0])
+    lines.append(msg)
 
 forms.alert("\n".join(lines), title="QuickDimsSpacing - Done")
