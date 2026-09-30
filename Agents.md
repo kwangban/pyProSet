@@ -78,10 +78,11 @@ found. Allows one CSV to span multiple SP files.
 3. Commit and push to `main`
 4. In Revit: pyRevit tab -> Reload
 
-pyRevit clones this repo into `Extensions/pyProSet.extension/` via the `giturl` in
-`pyRevit_config.ini`. After the initial clone, changes are picked up on Reload. If
-Reload doesn't pull (known telemetry bug), run `git pull` manually in the Extensions
-clone folder or close/reopen Revit.
+`startup.py` at the repo root runs `git pull --ff-only` automatically on every
+pyRevit Reload, so the Extensions clone always tracks `main` without manual steps.
+If pull fails (no network, merge conflict), it fails silently and the existing
+code continues to load. Run `git pull` manually in the Extensions clone folder
+(`%APPDATA%\pyRevit\Extensions\pyProSet.extension\`) and reload again to recover.
 
 ## How to Run Tests
 ```bash

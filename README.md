@@ -220,8 +220,12 @@ In Revit: **pyRevit tab -> Settings -> Extensions -> Add extension from URL**
 URL: `https://github.com/kwangban/pyProSet.git`
 
 pyRevit clones the repo into `Extensions/pyProSet.extension/` and loads `pyProSet.tab/`
-from the root. After the initial install, every push to `main` is picked up on the next
-pyRevit reload — no manual file copying needed.
+from the root. A `startup.py` at the repo root runs `git pull --ff-only` automatically
+on every pyRevit reload, so pushing to `main` is always picked up on the next reload
+without any manual steps.
+
+If a reload doesn't pick up changes (e.g. no network), run `git pull` manually in the
+Extensions clone folder and reload again.
 
 ### Automated Git Deployment Loop
 
