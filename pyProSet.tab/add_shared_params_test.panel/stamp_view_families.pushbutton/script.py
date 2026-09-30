@@ -319,39 +319,45 @@ for family in families.values():
         if p['name'] not in existing and p['name'] in definitions
     ]
 
-    if not to_add:
+    # ------------------------------------------------------------------
+    # Transaction 1 — Add missing parameters (skipped when none are missing).
+    # ------------------------------------------------------------------
+    added_names = []
+    if to_add:
+        t1 = DB.Transaction(family_doc, "Add Stratus Parameters")
+        try:
+            t1.Start()
+            for p in to_add:
+                app.SharedParametersFilename = sp_file_map[p['name']]
+                family_doc.FamilyManager.AddParameter(
+                    definitions[p['name']],
+                    _get_revit_group(p['group']),
+                    p['is_instance'],
+                )
+                added_names.append(p['name'])
+            t1.Commit()
+        except Exception as ex:
+            if t1.HasStarted() and not t1.HasEnded():
+                t1.RollBack()
+            app.SharedParametersFilename = original_sp or ""
+            family_doc.Close(False)
+            results.append((fam_name, "FAILED T1 (add params): {}".format(str(ex))))
+            continue
+        finally:
+            app.SharedParametersFilename = original_sp or ""
+
+    # Re-fetch after T1 (or current state when T1 was skipped).
+    all_fp = list(family_doc.FamilyManager.GetParameters())
+
+    # Re-stamp formulas on ALL CSV params present in the family, not just
+    # newly added ones — corrects wrong formulas from a previous run.
+    _after_names = frozenset(fp.Definition.Name for fp in all_fp)
+    to_formula   = [p for p in param_list if p['name'] in _after_names]
+
+    if not to_formula:
         family_doc.Close(False)
         results.append((fam_name, "already complete — skipped"))
         continue
-
-    # ------------------------------------------------------------------
-    # Transaction 1 — Add missing parameters.
-    # ------------------------------------------------------------------
-    added_names = []
-    t1 = DB.Transaction(family_doc, "Add Stratus Parameters")
-    try:
-        t1.Start()
-        for p in to_add:
-            app.SharedParametersFilename = sp_file_map[p['name']]
-            family_doc.FamilyManager.AddParameter(
-                definitions[p['name']],
-                _get_revit_group(p['group']),
-                p['is_instance'],
-            )
-            added_names.append(p['name'])
-        t1.Commit()
-    except Exception as ex:
-        if t1.HasStarted() and not t1.HasEnded():
-            t1.RollBack()
-        app.SharedParametersFilename = original_sp or ""
-        family_doc.Close(False)
-        results.append((fam_name, "FAILED T1 (add params): {}".format(str(ex))))
-        continue
-    finally:
-        app.SharedParametersFilename = original_sp or ""
-
-    # Re-fetch handles after T1 commits.
-    all_fp = list(family_doc.FamilyManager.GetParameters())
 
     # ------------------------------------------------------------------
     # Build formula assignments (keyword match, batch-mode: first-alpha on tie).
@@ -360,7 +366,7 @@ for family in families.values():
     no_source           = []   # param_names with no keyword match
     ambiguous           = []   # param_names where first-alpha was used
 
-    for p in to_add:
+    for p in to_formula:
         if p['data_type'].strip().lower() in TEXT_DATATYPES:
             continue
 

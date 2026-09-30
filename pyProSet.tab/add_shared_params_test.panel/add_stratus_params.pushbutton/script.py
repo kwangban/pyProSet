@@ -261,15 +261,17 @@ else:
     app.SharedParametersFilename = original_sp or ""
 
 # ---------------------------------------------------------------------------
-# Build formula assignments for newly added non-Text parameters.
+# Build formula assignments for ALL non-Text CSV params present in the family,
+# including those that already existed before this run (re-stamps formulas so
+# that a second run corrects any wrong formula from a previous run).
 #
 # Keyword derivation: strip leading 'CP_', replace '_' with ' ', lowercase.
 #   CP_Weight          -> 'weight' (want_per_unit=False)
 #   CP_Weight_Per_Foot -> 'weight per foot' (want_per_unit=True)
 #   CP_Length          -> 'length'
 #
-# The keyword is matched against existing family param names (substring match).
-# output_names are excluded so we never create a circular formula.
+# Primary search: output_names excluded to prevent circular self-reference.
+# Synonym fallback: output_names allowed but sorted first (preferred).
 # ---------------------------------------------------------------------------
 all_family_params = list(doc.FamilyManager.GetParameters())  # re-fetch after T1
 
@@ -279,10 +281,13 @@ _MASS_DATATYPES = frozenset(('mass', 'mass per unit length'))
 # (e.g. "weight per foot" won't find "Pounds Per Foot").
 _WEIGHT_SYNONYMS = ('weight', 'pound', 'lbf', 'kip', 'plf')
 
-formula_assignments = {}   # added CP_* name -> formula string
-formula_not_found   = []   # CP_* names where no matching source was found
+_family_param_names = frozenset(fp.Definition.Name for fp in all_family_params)
+to_formula = [p for p in param_list if p['name'] in _family_param_names]
 
-for p in to_add:
+formula_assignments = {}   # CP_* name -> formula string
+formula_not_found   = []   # CP_* names where no source was found
+
+for p in to_formula:
     if p['data_type'].strip().lower() in TEXT_DATATYPES:
         continue
 
