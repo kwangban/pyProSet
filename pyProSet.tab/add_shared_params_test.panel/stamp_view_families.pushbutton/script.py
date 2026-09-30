@@ -373,6 +373,7 @@ for family in families.values():
             [
                 fp for fp in all_fp
                 if keyword in fp.Definition.Name.lower()
+                and fp.Definition.Name not in output_names
                 and fp.Definition.Name != param_name
                 and is_per_unit(fp.Definition.Name) == want_per_unit
             ],
@@ -386,6 +387,7 @@ for family in families.values():
                 [
                     fp for fp in all_fp
                     if any(syn in fp.Definition.Name.lower() for syn in _WEIGHT_SYNONYMS)
+                    and fp.Definition.Name not in output_names
                     and fp.Definition.Name != param_name
                     and is_per_unit(fp.Definition.Name) == want_per_unit
                 ],

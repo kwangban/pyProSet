@@ -294,6 +294,7 @@ for p in to_add:
     candidates = [
         fp for fp in all_family_params
         if keyword in fp.Definition.Name.lower()
+        and fp.Definition.Name not in output_names
         and fp.Definition.Name != param_name
         and is_per_unit(fp.Definition.Name) == want_per_unit
     ]
@@ -304,6 +305,7 @@ for p in to_add:
         candidates = [
             fp for fp in all_family_params
             if any(syn in fp.Definition.Name.lower() for syn in _WEIGHT_SYNONYMS)
+            and fp.Definition.Name not in output_names
             and fp.Definition.Name != param_name
             and is_per_unit(fp.Definition.Name) == want_per_unit
         ]
