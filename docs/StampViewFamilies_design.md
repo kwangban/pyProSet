@@ -127,11 +127,16 @@ FAILED T1.
 ### 4. Formula assignment (batch mode)
 After T1 commits, `all_fp` is re-fetched. For each newly added non-Text
 parameter the same keyword derivation and synonym fallback as `add_stratus_params`
-is applied, with one difference:
+is applied, with these differences:
 
 > **No interactive picker.** When multiple source candidates match, the script
 > takes the **first alphabetically** and notes the ambiguity in the per-family
 > report. This avoids repeated dialogs when many families are processed.
+
+> **`output_names` exclusion.** Candidate parameters must not be in `output_names`
+> (the frozenset of all CSV param names). This prevents a CP_* param whose name
+> contains the search keyword (e.g. `CP_BOM_Weight` matching "weight") from being
+> chosen as a formula source, which would create a circular reference.
 
 ### 5. T2 — Set formulas
 Individual formula failures are caught per-parameter. T2 rolls back

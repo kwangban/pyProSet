@@ -76,8 +76,12 @@ CP_Length,Length,No,Constraints,
 **Weight parameter detection (for formula chaining):**
 
 Any parameter typed as Force (lbf), Structural Weight (lbf), or Mass (lbm), or whose
-name contains "weight" (case-insensitive), excluding per-unit variants like
-`Weight_per_foot`. If the source reports in lbf, the formula divides by 32.174.
+name contains "weight" (case-insensitive), excluding:
+- Per-unit variants like `Weight_per_foot` (matched separately by `CP_Weight_Per_Foot`)
+- Any parameter already in the CSV (`output_names` exclusion prevents circular references
+  — e.g. `CP_BOM_Weight` will not be used as the formula source for `CP_Weight`)
+
+If the source reports in lbf, the formula divides by 32.174.
 Both Force and Weight (Structural) require this conversion — they are distinct Revit
 API types (`SpecTypeId.Force` vs `SpecTypeId.Weight`) but both report in lbf.
 
@@ -187,7 +191,7 @@ pyProSet/
 ├── tests/
 │   └── test_shared_param_utils.py   56 tests; runs in CPython without Revit
 ├── sample_params/
-│   └── CP_Parameters.csv            Starter CSV with 17 CP_* parameters
+│   └── CP_Parameters.csv            Starter CSV with 18 CP_* parameters
 ├── docs/
 │   ├── AddStratusParams_design.md   Design doc: CSV workflow, SP file resolution, formulas
 │   ├── QuickDimsSpacing_design.md   Design doc: API concepts, spacing math, limitations

@@ -127,8 +127,14 @@ CP_Length          → keyword "length",            want_per_unit=False
 ```
 
 **Primary search**: case-insensitive substring match of keyword against
-existing family parameter names, excluding self and respecting the per-unit
-flag.
+existing family parameter names, excluding:
+- The parameter itself (`fp.Definition.Name != param_name`)
+- All other CSV output parameters (`fp.Definition.Name not in output_names`)
+
+The `output_names` exclusion is essential — without it a CP_* param whose name
+contains the keyword (e.g. `CP_BOM_Weight` matching keyword "weight") would be
+chosen as the formula source, creating a circular reference. Self-exclusion
+alone is not sufficient.
 
 **Synonym fallback** (mass-typed targets only): if primary search returns no
 candidates, retries with `('weight', 'pound', 'lbf', 'kip', 'plf')` to handle

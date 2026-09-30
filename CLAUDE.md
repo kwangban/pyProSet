@@ -19,7 +19,7 @@ be IronPython-compatible so the same code runs in both Revit and tests:
   No imports from `pyrevit`, `Autodesk.Revit.DB`, or any package not in stdlib here
   (stubs handle the Revit API boundary; see `lib/shared_param_utils.py`).
 - `tests/` — pytest suite that runs in CPython 3. Only `pytest` is required; no extra deps.
-- `sample_params/` — starter CSV files for end users. `CP_Parameters.csv` lists the 16
+- `sample_params/` — starter CSV files for end users. `CP_Parameters.csv` lists the 18
   default CP_* parameters used with `add_stratus_params`.
 
 ## script.py files are thin glue
@@ -56,7 +56,10 @@ belongs to.
 `add_stratus_params` detects a formula source by keyword matching:
 - Strip the `CP_` prefix and lowercase the suffix to get the keyword.
 - Match against existing family parameter names (substring, case-insensitive).
-- Exclude output parameters (`is_output_param()` with the frozenset from the CSV).
+- Exclude output parameters: `fp.Definition.Name not in output_names` (the frozenset
+  of all CSV parameter names). Self-exclusion alone (`!= param_name`) is not sufficient —
+  other CSV params that share a keyword substring (e.g. `CP_BOM_Weight` matching "weight")
+  would otherwise be chosen as formula sources, creating circular references.
 - Respect per-unit flag: `is_per_unit()` must match between candidate and target
   (e.g. `CP_Weight_Per_Foot` only matches per-unit candidates).
 - **Revit's "Weight" (Discipline: Structural, Type: Weight)** is a distinct API type
