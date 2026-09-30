@@ -109,7 +109,14 @@ referenced in formulas.
   inside a committed transaction are unsafe.
 
 **T2 — Set Formulas**
-- Calls `FamilyManager.SetFormula(fp, formula_string)` for each assignment.
+- Iterates `formula_assignments` sorted so **native-source formulas run first**
+  (source NOT in `output_names`), then **CSV-source formulas** (source in
+  `output_names`). This prevents circular-dependency rejections when re-stamping
+  a family that already has wrong formulas: `CP_Weight = CP_Fab Weight` is applied
+  before `CP_BOM_Weight = CP_Weight`, breaking the old circular chain first.
+  Without this ordering, IronPython 2.7's unordered dict iteration could attempt
+  `CP_BOM_Weight = CP_Weight` while `CP_Weight` still references `CP_BOM_Weight`,
+  causing Revit to roll back the entire T2.
 - Individual formula failures are caught per-parameter and noted in the report.
 - T2 rolls back independently if it throws; T1 results (the added parameters)
   are kept.

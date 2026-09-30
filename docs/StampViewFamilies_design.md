@@ -148,6 +148,11 @@ is applied, with these differences:
 > producing a spurious conversion if not guarded.
 
 ### 5. T2 — Set formulas
+Iterates formula assignments sorted so **native-source formulas run first**
+(source NOT in `output_names`), then **CSV-source formulas** (source in
+`output_names`). This prevents circular-dependency rejections when re-stamping:
+`CP_Weight = CP_Fab Weight` is applied before `CP_BOM_Weight = CP_Weight`,
+breaking any existing wrong circular chain before the derived formula is set.
 Individual formula failures are caught per-parameter. T2 rolls back
 independently on a fatal exception; T1 results (added parameters) are kept.
 

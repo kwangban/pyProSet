@@ -98,7 +98,7 @@ t1.Commit()
 # Re-fetch handle — stale handles from inside a committed transaction are unsafe
 fp = next(p for p in doc.FamilyManager.GetParameters() if p.Definition.Name == name)
 
-# T2 — set formulas
+# T2 — set formulas (native-source first, CSV-source second — see below)
 t2 = DB.Transaction(doc, "Set Formulas")
 t2.Start()
 doc.FamilyManager.SetFormula(fp, formula_string)
@@ -107,6 +107,31 @@ t2.Commit()
 
 If T2 fails (e.g. unit-type mismatch), roll it back and report which formulas need
 manual entry — the parameters added in T1 are still saved.
+
+### T2 iteration order — breaking circular chains
+
+When re-stamping a family that already has wrong formulas (e.g. `CP_Weight =
+CP_BOM_Weight / 32.174`), the order in which `SetFormula` calls are made matters.
+IronPython 2.7 dict iteration is unordered; if `CP_BOM_Weight = CP_Weight` is
+attempted while `CP_Weight` still references `CP_BOM_Weight`, Revit detects a
+circular dependency and rolls back the entire T2 — leaving both formulas unchanged.
+
+Always sort the formula assignments in T2 so **native-source formulas run first**
+(their source is NOT a CSV param) before **CSV-source formulas** (their source IS
+another CP_* param):
+
+```python
+_sorted = sorted(
+    formula_assignments.items(),
+    key=lambda x: any(x[1].startswith(n) for n in output_names),
+    # False (native source) sorts before True (CSV source)
+)
+for param_name, formula in _sorted:
+    doc.FamilyManager.SetFormula(fp, formula)
+```
+
+This ensures `CP_Weight = CP_Fab Weight` is applied before `CP_BOM_Weight =
+CP_Weight`, so the old circular reference is broken first.
 
 ## SharedParametersFilename gotcha
 `load_definition()` and `find_definition()` temporarily set `app.SharedParametersFilename`

@@ -130,7 +130,7 @@ t1.Commit()
 # Re-fetch — stale handles from inside a committed transaction are unsafe
 fp = next(p for p in doc.FamilyManager.GetParameters() if p.Definition.Name == name)
 
-# T2 — set formulas
+# T2 — set formulas (native-source first; see ordering rule below)
 t2 = DB.Transaction(doc, "Set Formulas")
 t2.Start()
 doc.FamilyManager.SetFormula(fp, formula_string)
@@ -139,6 +139,25 @@ t2.Commit()
 
 If T2 fails, roll it back, save the family (T1 results kept), and report which
 parameters need manual formula entry.
+
+### T2 iteration order — breaking circular chains
+
+IronPython 2.7 dict iteration is unordered. When re-stamping a family that already
+has wrong formulas (e.g. `CP_Weight = CP_BOM_Weight / 32.174`), setting
+`CP_BOM_Weight = CP_Weight` before `CP_Weight`'s old formula is cleared causes
+Revit to detect a circular dependency and roll back all of T2.
+
+Always sort T2 so **native-source formulas run first** (source NOT in `output_names`)
+before **CSV-source formulas** (source in `output_names`):
+
+```python
+_sorted = sorted(
+    formula_assignments.items(),
+    key=lambda x: any(x[1].startswith(n) for n in output_names),
+)
+# False (native) sorts before True (CSV), so CP_Weight = CP_Fab Weight
+# is set before CP_BOM_Weight = CP_Weight.
+```
 
 ## SharedParametersFilename Gotcha
 `find_definition()` sets `app.SharedParametersFilename` temporarily and **always
