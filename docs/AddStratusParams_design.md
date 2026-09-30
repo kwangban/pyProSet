@@ -129,16 +129,23 @@ CP_Length          → keyword "length",            want_per_unit=False
 **Primary search**: case-insensitive substring match of keyword against
 existing family parameter names, excluding:
 - The parameter itself (`fp.Definition.Name != param_name`)
-- All other CSV output parameters (`fp.Definition.Name not in output_names`)
+- All CSV output parameters (`fp.Definition.Name not in output_names`)
 
-The `output_names` exclusion is essential — without it a CP_* param whose name
-contains the keyword (e.g. `CP_BOM_Weight` matching keyword "weight") would be
-chosen as the formula source, creating a circular reference. Self-exclusion
-alone is not sufficient.
+The `output_names` exclusion prevents `CP_Weight` from picking `CP_BOM_Weight`
+as its source (both contain "weight"). Self-exclusion alone is not sufficient.
 
 **Synonym fallback** (mass-typed targets only): if primary search returns no
-candidates, retries with `('weight', 'pound', 'lbf', 'kip', 'plf')` to handle
-names like `CP_Pounds Per Foot` that don't substring-match `weight per foot`.
+candidates, retries with `('weight', 'pound', 'lbf', 'kip', 'plf')`. Unlike the
+primary search, `output_names` params are **allowed** here — they are sorted
+first in the candidate list so that intra-CSV chaining is preferred. Example:
+`CP_BOM_Weight` (keyword "bom weight") finds nothing in the primary search, falls
+to the synonym fallback, and picks `CP_Weight` (CSV param, sorted before
+`CP_Fab Weight`) rather than the native family weight param.
+
+**`source_is_force` guard**: when the chosen source is itself a CSV param (in
+`output_names`), the `/32.174` conversion is skipped regardless of `_is_force()`.
+Newly added shared params of type Mass trigger the `ASSUME_WEIGHT_SOURCE_IS_LBF =
+True` fallback, which would apply a spurious conversion to an already-lbm source.
 
 **Multi-match**: `forms.ask_for_one_item()` dialog lets the user choose the
 source parameter. If the user cancels, the parameter is noted for manual entry.

@@ -133,10 +133,19 @@ is applied, with these differences:
 > takes the **first alphabetically** and notes the ambiguity in the per-family
 > report. This avoids repeated dialogs when many families are processed.
 
-> **`output_names` exclusion.** Candidate parameters must not be in `output_names`
-> (the frozenset of all CSV param names). This prevents a CP_* param whose name
-> contains the search keyword (e.g. `CP_BOM_Weight` matching "weight") from being
-> chosen as a formula source, which would create a circular reference.
+> **Primary search `output_names` exclusion.** The primary keyword candidates
+> must not be in `output_names`. This prevents `CP_Weight` from picking
+> `CP_BOM_Weight` as its source when both names contain "weight".
+
+> **Synonym fallback allows `output_names` (preferred).** When the primary
+> keyword finds nothing (e.g. keyword "bom weight" for `CP_BOM_Weight`), the
+> synonym fallback includes CSV params but sorts them first — so `CP_BOM_Weight`
+> chains to `CP_Weight` rather than the native family weight param.
+
+> **`source_is_force` guard.** When the chosen source is itself a CSV param,
+> the `/32.174` conversion is skipped. Newly added shared params of type Mass
+> trigger the `ASSUME_WEIGHT_SOURCE_IS_LBF = True` fallback in `_is_force()`,
+> producing a spurious conversion if not guarded.
 
 ### 5. T2 — Set formulas
 Individual formula failures are caught per-parameter. T2 rolls back

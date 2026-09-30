@@ -56,10 +56,17 @@ belongs to.
 `add_stratus_params` detects a formula source by keyword matching:
 - Strip the `CP_` prefix and lowercase the suffix to get the keyword.
 - Match against existing family parameter names (substring, case-insensitive).
-- Exclude output parameters: `fp.Definition.Name not in output_names` (the frozenset
-  of all CSV parameter names). Self-exclusion alone (`!= param_name`) is not sufficient —
-  other CSV params that share a keyword substring (e.g. `CP_BOM_Weight` matching "weight")
-  would otherwise be chosen as formula sources, creating circular references.
+- **Primary keyword search**: exclude `output_names` entirely (`fp.Definition.Name not in
+  output_names`). This prevents `CP_Weight` from picking `CP_BOM_Weight` as its source.
+- **Synonym fallback** (mass targets only — keywords like "bom weight" that match nothing):
+  allow `output_names` params but put them first in the candidate list, sorted alphabetically
+  within each group (CSV params first, native family params second). This causes `CP_BOM_Weight`
+  to chain to `CP_Weight` (preferred over native `CP_Fab Weight`) when the primary keyword
+  search finds nothing.
+- **`source_is_force` guard**: when the source is another CSV param, skip `_is_force()` and
+  treat the source as lbm (no `/32.174`). CSV params are always defined as Mass in the shared
+  parameter file; calling `_is_force()` on a freshly added shared param triggers the
+  `ASSUME_WEIGHT_SOURCE_IS_LBF = True` fallback, producing a false-positive lbf conversion.
 - Respect per-unit flag: `is_per_unit()` must match between candidate and target
   (e.g. `CP_Weight_Per_Foot` only matches per-unit candidates).
 - **Revit's "Weight" (Discipline: Structural, Type: Weight)** is a distinct API type

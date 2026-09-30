@@ -382,16 +382,20 @@ for family in families.values():
 
         # Keyword like "weight per foot" won't match "Pounds Per Foot".
         # For mass-typed targets with no primary hit, retry with weight synonyms.
+        # Intra-CSV params are preferred (sorted first) so that e.g. CP_BOM_Weight
+        # chains to CP_Weight rather than the native family weight param.
         if not candidates and p['data_type'].strip().lower() in _MASS_DATATYPES:
-            candidates = sorted(
-                [
-                    fp for fp in all_fp
-                    if any(syn in fp.Definition.Name.lower() for syn in _WEIGHT_SYNONYMS)
-                    and fp.Definition.Name not in output_names
-                    and fp.Definition.Name != param_name
-                    and is_per_unit(fp.Definition.Name) == want_per_unit
-                ],
-                key=lambda fp: fp.Definition.Name,
+            _syn = [
+                fp for fp in all_fp
+                if any(syn in fp.Definition.Name.lower() for syn in _WEIGHT_SYNONYMS)
+                and fp.Definition.Name != param_name
+                and is_per_unit(fp.Definition.Name) == want_per_unit
+            ]
+            candidates = (
+                sorted([fp for fp in _syn if fp.Definition.Name in output_names],
+                       key=lambda fp: fp.Definition.Name) +
+                sorted([fp for fp in _syn if fp.Definition.Name not in output_names],
+                       key=lambda fp: fp.Definition.Name)
             )
 
         if not candidates:
@@ -402,8 +406,12 @@ for family in families.values():
         if len(candidates) > 1:
             ambiguous.append(param_name)
 
+        # Skip the lbf check when sourcing from another CSV param: those are always
+        # Mass (lbm), so _is_force() would give a false positive via the
+        # ASSUME_WEIGHT_SOURCE_IS_LBF fallback on a newly added parameter.
         source_is_force = (
             p['data_type'].strip().lower() in _MASS_DATATYPES
+            and source_fp.Definition.Name not in output_names
             and _is_force(source_fp)
         )
         formula_assignments[param_name] = make_formula(

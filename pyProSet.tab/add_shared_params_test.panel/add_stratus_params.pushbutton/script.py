@@ -301,14 +301,21 @@ for p in to_add:
 
     # Keyword like "weight per foot" won't match "Pounds Per Foot".
     # For mass-typed targets with no primary hit, retry with weight synonyms.
+    # Intra-CSV params are preferred (sorted first) so that e.g. CP_BOM_Weight
+    # chains to CP_Weight rather than the native family weight param.
     if not candidates and p['data_type'].strip().lower() in _MASS_DATATYPES:
-        candidates = [
+        _syn = [
             fp for fp in all_family_params
             if any(syn in fp.Definition.Name.lower() for syn in _WEIGHT_SYNONYMS)
-            and fp.Definition.Name not in output_names
             and fp.Definition.Name != param_name
             and is_per_unit(fp.Definition.Name) == want_per_unit
         ]
+        candidates = (
+            sorted([fp for fp in _syn if fp.Definition.Name in output_names],
+                   key=lambda fp: fp.Definition.Name) +
+            sorted([fp for fp in _syn if fp.Definition.Name not in output_names],
+                   key=lambda fp: fp.Definition.Name)
+        )
 
     if not candidates:
         formula_not_found.append(param_name)
@@ -330,8 +337,12 @@ for p in to_add:
         source_fp = next(fp for fp in candidates if fp.Definition.Name == chosen)
 
     # Apply /32.174 only when target is a mass type and source reports in lbf.
+    # Skip the check when sourcing from another CSV param: those are always Mass
+    # (lbm) in the shared param file, so _is_force() would give a false positive
+    # via the ASSUME_WEIGHT_SOURCE_IS_LBF fallback on a newly added parameter.
     source_is_force = (
         p['data_type'].strip().lower() in _MASS_DATATYPES
+        and source_fp.Definition.Name not in output_names
         and _is_force(source_fp)
     )
     formula_assignments[param_name] = make_formula(

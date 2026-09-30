@@ -96,9 +96,14 @@ No Revit installation required. Tests exercise the stub path of `lib/shared_para
 prefix, lowercase, replace `_` with space) and matches it against existing family
 parameter names.
 
-- Exclude parameters in `output_names` (the frozenset of names from the CSV) to avoid
-  circular references. The candidate filter must include
-  `and fp.Definition.Name not in output_names` (self-exclusion alone is not enough).
+- **Primary keyword search**: `output_names` is excluded entirely — prevents `CP_Weight`
+  from picking `CP_BOM_Weight` as its source.
+- **Synonym fallback** (mass targets, no primary hit): `output_names` params are allowed but
+  sorted first in the candidate list. This gives `CP_BOM_Weight` → `CP_Weight` instead of
+  `CP_BOM_Weight` → `CP_Fab Weight` when the primary keyword "bom weight" matches nothing.
+- **`source_is_force` guard**: if the source param is in `output_names`, skip `_is_force()`
+  and treat it as lbm (no `/32.174`). Newly added shared params of type Mass trigger the
+  `ASSUME_WEIGHT_SOURCE_IS_LBF = True` fallback in `_is_force()`, producing a false positive.
 - Use `is_per_unit()` to distinguish `CP_Weight` (not per-unit) from `CP_Weight_Per_Foot`
   (per-unit) so each only matches appropriate candidates.
 - **Revit's "Weight" (Discipline: Structural, Type: Weight)** is a distinct API type
