@@ -102,7 +102,11 @@ T2 rolls back but T1 results are kept. The report lists formulas that need manua
 
 - `lib/shared_param_utils.py`: stub-aware parser for Revit shared param `.txt` files,
   `parse_param_csv()`, `find_definition()`, `make_formula()` — all testable without Revit
-- `tests/`: pytest suite (56 tests) covering parser, CSV reader, and formula logic
+- `tests/`: pytest suite (59 tests) covering parser, CSV reader, and formula logic
+
+See [`docs/AddStratusParams_design.md`](docs/AddStratusParams_design.md) and
+[`docs/StampViewFamilies_design.md`](docs/StampViewFamilies_design.md) for full
+API details, the two-transaction pattern, SP file resolution, and formula logic.
 
 **Definition of done:** Phase 1 is complete when:
 - All `tests/` pass in a plain Python environment (`pytest tests/ -v`)
@@ -160,6 +164,8 @@ full API details, the stacking-direction formula, and known limitations.
 
 ---
 
+---
+
 ## Repository Structure
 
 ```
@@ -183,7 +189,9 @@ pyProSet/
 ├── sample_params/
 │   └── CP_Parameters.csv            Starter CSV with 17 CP_* parameters
 ├── docs/
-│   └── QuickDimsSpacing_design.md   Design doc: API concepts, spacing math, limitations
+│   ├── AddStratusParams_design.md   Design doc: CSV workflow, SP file resolution, formulas
+│   ├── QuickDimsSpacing_design.md   Design doc: API concepts, spacing math, limitations
+│   └── StampViewFamilies_design.md  Design doc: bulk-stamp workflow, batch mode, reload
 ├── CLAUDE.md                        Rules for Claude Code agents working in this repo
 └── README.md
 ```

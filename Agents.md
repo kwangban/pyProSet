@@ -26,7 +26,9 @@ pyProSet/
 ├── sample_params/
 │   └── CP_Parameters.csv          Starter CSV with 17 default CP_* parameters
 ├── docs/
-│   └── QuickDimsSpacing_design.md Design doc for the quick_dims_spacing button
+│   ├── AddStratusParams_design.md  Design doc: CSV workflow, SP file resolution, formulas
+│   ├── QuickDimsSpacing_design.md  Design doc: spacing math, stacking direction, limits
+│   └── StampViewFamilies_design.md Design doc: bulk-stamp workflow, batch mode, reload
 ├── CLAUDE.md                      Rules for Claude Code agents
 ├── Agents.md                      This file
 └── README.md
