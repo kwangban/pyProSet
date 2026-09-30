@@ -155,6 +155,7 @@ def parse_param_csv(csv_path):
                 "data_type":   (row.get("DataType") or "").strip(),
                 "is_instance": (row.get("Instance") or "").strip().lower() == "yes",
                 "group":       (row.get("Group") or "").strip(),
+                "sp_file":     (row.get("SPFile") or "").strip(),
             })
     return entries
 

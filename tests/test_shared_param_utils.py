@@ -359,3 +359,30 @@ class TestParseParamCsv:
         csv.write_text("Name,DataType,Instance,Group\n")
         entries = parse_param_csv(str(csv))
         assert entries == []
+
+    def test_sp_file_column_populated(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(
+            "Name,DataType,Instance,Group,SPFile\n"
+            "CP_BOM_Category,Text,Yes,Identity Data,BOM_Params.txt\n"
+        )
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['sp_file'] == "BOM_Params.txt"
+
+    def test_sp_file_column_blank_defaults_to_empty(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(
+            "Name,DataType,Instance,Group,SPFile\n"
+            "CP_Weight,Mass,Yes,Construction,\n"
+        )
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['sp_file'] == ""
+
+    def test_sp_file_column_absent_defaults_to_empty(self, tmp_path):
+        csv = tmp_path / "params.csv"
+        csv.write_text(
+            "Name,DataType,Instance,Group\n"
+            "CP_Weight,Mass,Yes,Construction\n"
+        )
+        entries = parse_param_csv(str(csv))
+        assert entries[0]['sp_file'] == ""

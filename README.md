@@ -46,12 +46,11 @@ changes needed when the list grows or changes.
 **CSV format (`sample_params/CP_Parameters.csv`):**
 
 ```csv
-Name,DataType,Instance,Group
-CP_Weight,Mass,Yes,Construction
-CP_Weight_Per_Foot,Mass per Unit Length,Yes,Construction
-CP_Length,Length,No,Constraints
-CP_Size,Text,No,Constraints
-CP_Description,Text,No,Identity Data
+Name,DataType,Instance,Group,SPFile
+CP_Weight,Mass,Yes,Construction,
+CP_Weight_Per_Foot,Mass per Unit Length,Yes,Construction,
+CP_BOM_Category,Text,Yes,Identity Data,BOM_Parameters.txt
+CP_Length,Length,No,Constraints,
 ...
 ```
 
@@ -59,6 +58,10 @@ CP_Description,Text,No,Identity Data
 - `Group`: one of `Constraints`, `Construction`, `Set`, `Data`, `Identity Data`
   (case-insensitive; unknown values fall back to `Construction`)
 - `DataType`: used only for formula conversion logic (actual Revit type comes from the `.txt` file)
+- `SPFile` *(optional)*: filename or absolute path of the shared parameter `.txt` file
+  that contains this parameter. If blank, the file selected at startup is used.
+  A bare filename (e.g. `BOM_Parameters.txt`) is resolved relative to the primary
+  SP file's directory; if not found there the user is prompted to locate it.
 
 **Group meanings:**
 

@@ -30,7 +30,13 @@ Each pushbutton `script.py` should:
 
 ## CSV-driven parameter import (add_stratus_params)
 The `add_stratus_params` button reads which parameters to import from a user-selected CSV.
-CSV columns: `Name`, `DataType`, `Instance` (Yes/No), `Group`.
+CSV columns: `Name`, `DataType`, `Instance` (Yes/No), `Group`, `SPFile` (optional).
+
+**`SPFile` column**: filename or absolute path of the shared parameter `.txt` file
+that contains this parameter. Blank (or column absent) → use the primary file selected
+at startup. A bare filename is resolved relative to the primary SP file's directory;
+if not found there, the user is prompted to locate it. Allows parameters from multiple
+shared parameter files to coexist in one CSV.
 
 **Group -> Revit API mapping** (version-aware; unknown names fall back to Construction):
 

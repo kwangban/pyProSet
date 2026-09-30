@@ -34,6 +34,8 @@ Version compatibility
 - Revit 2021-  : ParameterType / BuiltInParameterGroup
 """
 
+import os as _os
+
 from pyrevit import DB, forms, script
 from shared_param_utils import (  # noqa: F401 -- lib/
     parse_param_csv,
@@ -41,6 +43,27 @@ from shared_param_utils import (  # noqa: F401 -- lib/
     is_per_unit,
     make_formula,
 )
+
+
+def _resolve_alt_sp_file(sp_file_value, primary_sp_dir):
+    """Resolve an SPFile CSV value to an absolute path.
+
+    1. Already an absolute path that exists -> use as-is.
+    2. Filename / relative path -> resolve from same directory as primary SP file.
+    3. Still not found -> prompt the user; exit if cancelled.
+    """
+    if _os.path.isabs(sp_file_value) and _os.path.isfile(sp_file_value):
+        return sp_file_value
+    candidate = _os.path.join(primary_sp_dir, sp_file_value)
+    if _os.path.isfile(candidate):
+        return candidate
+    resolved = forms.pick_file(
+        file_ext="txt",
+        title="Locate shared parameter file: {}".format(sp_file_value),
+    )
+    if not resolved:
+        script.exit()
+    return resolved
 
 # ---------------------------------------------------------------------------
 # CONFIGURE
@@ -142,6 +165,21 @@ if not param_list:
 output_names = frozenset(p['name'] for p in param_list)
 
 # ---------------------------------------------------------------------------
+# Resolve alternate SP files referenced in the CSV (SPFile column).
+# ---------------------------------------------------------------------------
+primary_sp_dir = _os.path.dirname(sp_file_path)
+_alt_resolved  = {}   # raw SPFile value -> absolute path
+for p in param_list:
+    alt = p['sp_file']
+    if alt and alt not in _alt_resolved:
+        _alt_resolved[alt] = _resolve_alt_sp_file(alt, primary_sp_dir)
+
+sp_file_map = {
+    p['name']: (_alt_resolved[p['sp_file']] if p['sp_file'] else sp_file_path)
+    for p in param_list
+}
+
+# ---------------------------------------------------------------------------
 # Pre-load all ExternalDefinitions ONCE before opening any family.
 # find_definition restores SharedParametersFilename each call; we also restore
 # here as a belt-and-suspenders measure.
@@ -152,7 +190,7 @@ original_sp  = app.SharedParametersFilename
 
 for p in param_list:
     try:
-        definitions[p['name']] = find_definition(app, sp_file_path, p['name'])
+        definitions[p['name']] = find_definition(app, sp_file_map[p['name']], p['name'])
     except ValueError:
         missing_defs.append(p['name'])
 
@@ -294,7 +332,7 @@ for family in families.values():
     try:
         t1.Start()
         for p in to_add:
-            app.SharedParametersFilename = sp_file_path
+            app.SharedParametersFilename = sp_file_map[p['name']]
             family_doc.FamilyManager.AddParameter(
                 definitions[p['name']],
                 _get_revit_group(p['group']),

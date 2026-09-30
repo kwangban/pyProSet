@@ -1,18 +1,19 @@
-Name,DataType,Instance,Group
-CP_Additional_Information,Text,Yes,Identity Data
-CP_Angle,Angle,Yes,Constraints
-CP_BOM_Weight,Mass,Yes,Construction
-CP_Description,Text,Yes,Identity Data
-CP_Diameter,Length,Yes,Constraints
-CP_Finish,Text,Yes,Construction
-CP_Length,Length,Yes,Constraints
-CP_Manufacturer,Text,Yes,Identity Data
-CP_Material,Text,Yes,Identity Data
-CP_Model_Number,Text,Yes,Identity Data
-CP_Product_Code,Text,Yes,Identity Data
-CP_Size,Text,Yes,Constraints
-CP_Thickness,Length,Yes,Constraints
-CP_Volume,Volume,Yes,Construction
-CP_Weight,Mass,Yes,Construction
-CP_Weight_Per_Foot,Mass per Unit Length,Yes,Set
-CP_Width,Length,Yes,Construction
+Name,DataType,Instance,Group,SPFile
+CP_Additional_Information,Text,Yes,Identity Data,
+CP_Angle,Angle,Yes,Constraints,
+CP_BOM_Category,Text,Yes,Identity Data,BOM_Parameters.txt
+CP_BOM_Weight,Mass,Yes,Construction,
+CP_Description,Text,Yes,Identity Data,
+CP_Diameter,Length,Yes,Constraints,
+CP_Finish,Text,Yes,Construction,
+CP_Length,Length,Yes,Constraints,
+CP_Manufacturer,Text,Yes,Identity Data,
+CP_Material,Text,Yes,Identity Data,
+CP_Model_Number,Text,Yes,Identity Data,
+CP_Product_Code,Text,Yes,Identity Data,
+CP_Size,Text,Yes,Constraints,
+CP_Thickness,Length,Yes,Constraints,
+CP_Volume,Volume,Yes,Construction,
+CP_Weight,Mass,Yes,Construction,
+CP_Weight_Per_Foot,Mass per Unit Length,Yes,Set,
+CP_Width,Length,Yes,Construction,

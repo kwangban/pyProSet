@@ -51,6 +51,12 @@ parameter names. CSV columns: `Name`, `DataType`, `Instance` (Yes/No), `Group`.
 The `sample_params/CP_Parameters.csv` file ships with the repo as a starting point;
 users can edit it or substitute their own CSV at run time.
 
+**`SPFile` column (optional)**: a bare filename (e.g. `BOM_Parameters.txt`) or
+absolute path pointing to the shared parameter `.txt` file that contains this
+parameter. Blank → primary SP file selected at startup. Resolved relative to the
+primary SP file's directory; falls back to a `forms.pick_file()` prompt if not
+found. Allows one CSV to span multiple SP files.
+
 **Group -> Revit API mapping** (version-aware, falls back to Construction if unknown):
 
 | CSV `Group`  | Revit pre-2022         | Revit 2022+              |
