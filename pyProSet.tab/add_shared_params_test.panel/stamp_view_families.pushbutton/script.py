@@ -434,7 +434,16 @@ for family in families.values():
         t2 = DB.Transaction(family_doc, "Set Stratus Parameter Formulas")
         try:
             t2.Start()
-            for param_name, formula in formula_assignments.items():
+            # Apply native-source formulas first (e.g. CP_Weight = CP_Fab Weight),
+            # then CSV-source formulas (e.g. CP_BOM_Weight = CP_Weight).
+            # This order breaks any existing circular chain before setting derived
+            # formulas, preventing Revit from rejecting CP_BOM_Weight = CP_Weight
+            # while CP_Weight still references CP_BOM_Weight.
+            _sorted_assignments = sorted(
+                formula_assignments.items(),
+                key=lambda x: any(x[1].startswith(n) for n in output_names),
+            )
+            for param_name, formula in _sorted_assignments:
                 fp = next(
                     (f for f in family_doc.FamilyManager.GetParameters()
                      if f.Definition.Name == param_name),
